@@ -2,7 +2,11 @@ package com.taomee.statlogger.util;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
+/**
+ * 
+ * @author looper
+ * @date 2016年5月24日
+ */
 public class MessyCodeCheck {
 	public static boolean isChinese(char c) {    
 	    Character.UnicodeBlock ub = Character.UnicodeBlock.of(c);    
