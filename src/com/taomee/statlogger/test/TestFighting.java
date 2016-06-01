@@ -4,6 +4,7 @@ import javax.swing.plaf.SliderUI;
 
 import org.junit.Test;
 
+import com.taomee.statlogger.StatCommon;
 import com.taomee.statlogger.StatLogger;
 
 /**
@@ -59,7 +60,7 @@ public class TestFighting {
 	public void test_reg_role()
 	{
 		
-		for(int i=0;i<30;i++)
+		for(int i=0;i<5;i++)
 		{
 		statLogger.reg_role("331025680", "-1", "-1", "192.168.11.120", "-1");
 		try {
@@ -70,6 +71,14 @@ public class TestFighting {
 		}
 		}
 		
+	}
+	
+	@Test
+	public void test_utf8()
+	{
+		//System.out.println(StatCommon.stat_is_utf8("鎴樺"));
+		//System.out.println("中国");
+		System.out.println(StatCommon.stat_is_utf8("*��JTP.jar�ļ����JTP�ļ���ȡ��ͼƬ��Դ"));
 	}
 	/**
 	 * 登录
