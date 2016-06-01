@@ -56,70 +56,109 @@ public class StatCommon {
 		return str.split(delim);
 	}
 
-	/*public static boolean stat_is_utf8(String strName) {
-		try {
-			Pattern p = Pattern.compile("\\s*|\t*|\r*|\n*");
-			Matcher m = p.matcher(strName);
-			String after = m.replaceAll("");
-			String temp = after.replaceAll("\\p{P}", "");
-			char[] ch = temp.trim().toCharArray();
-
-			int length = (ch != null) ? ch.length : 0;
-			for (int i = 0; i < length; i++) {
-				char c = ch[i];
-				if (!Character.isLetterOrDigit(c)) {
-					String str = "" + ch[i];
-					if (!str.matches("[\u4e00-\u9fa5]+")) {
-						return true;
-					}
+//	public static boolean stat_is_utf8(String strName) {
+//		try {
+//			Pattern p = Pattern.compile("\\s*|\t*|\r*|\n*");
+//			Matcher m = p.matcher(strName);
+//			String after = m.replaceAll("");
+//			String temp = after.replaceAll("\\p{P}", "");
+//			char[] ch = temp.trim().toCharArray();
+//
+//			int length = (ch != null) ? ch.length : 0;
+//			for (int i = 0; i < length; i++) {
+//				char c = ch[i];
+//				if (!Character.isLetterOrDigit(c)) {
+//					String str = "" + ch[i];
+//					if (!str.matches("[\u4e00-\u9fa5]+")) {
+//						return true;
+//					}
+//				}
+//			}
+//		} catch (Exception e) {
+//			e.printStackTrace();
+//		}
+//
+//		return false;
+//	}
+	
+//	//php改编版stat_is_utf8
+//	public static boolean stat_is_utf8(String str){
+//		for(int i=0;i<=str.length();i++){
+//			int c = str.charAt(i);
+//			if(c > 128){
+//				int bytes = 0;
+//				if(c>247){
+//					return false;
+//				}else if(c > 239){
+//					bytes = 4;
+//				}else if(c > 223){
+//					bytes = 3;
+//				}else if(c > 191){
+//					bytes = 2;
+//				}else{
+//					return false;
+//				}
+//				if((i+bytes)>str.length()){
+//					return false;
+//				}
+//				while(bytes > 1){
+//					i++;
+//					int b = str.charAt(i);
+//					if(b<128 || b>191){
+//						return false;
+//					}
+//					bytes--;
+//				}
+//			}
+//		}
+//		return true;
+//	}
+	
+	public static boolean stat_is_utf8(String str){
+		return !isMessyCode(str);
+	}
+	
+	private static boolean isMessyCode(String strName) {
+		Pattern p = Pattern.compile("\\s*|\t*|\r*|\n*");
+		Matcher m = p.matcher(strName);
+		String after = m.replaceAll("");
+		String temp = after.replaceAll("\\p{P}", "");
+		char[] ch = temp.trim().toCharArray();
+		float chLength = ch.length;
+		float count = 0;
+		for (int i = 0; i < ch.length; i++) {
+			char c = ch[i];
+			if (!Character.isLetterOrDigit(c)) {
+				if (!isChinese(c)) {
+					count = count + 1;
+					System.out.print(c);
 				}
 			}
-		} catch (Exception e) {
-			e.printStackTrace();
 		}
-
-		return false;
-	}*/
-	public static boolean isChinese(char c) {
-        Character.UnicodeBlock ub = Character.UnicodeBlock.of(c);
-        if (ub == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS
-                || ub == Character.UnicodeBlock.CJK_COMPATIBILITY_IDEOGRAPHS
-                || ub == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_A
-                || ub == Character.UnicodeBlock.GENERAL_PUNCTUATION
-                || ub == Character.UnicodeBlock.CJK_SYMBOLS_AND_PUNCTUATION
-                || ub == Character.UnicodeBlock.HALFWIDTH_AND_FULLWIDTH_FORMS) {
-            return true;
-        }
-        return false;
-    }
+		float result = count / chLength;
+		if (result > 0.4) {
+			return true;
+		} else {
+			return false;
+		}
+	}
 	
-	public static boolean stat_is_utf8(String strName) {
-		Pattern p = Pattern.compile("\\s*|t*|r*|n*");
-        Matcher m = p.matcher(strName);
-        String after = m.replaceAll("");
-        String temp = after.replaceAll("\\p{P}", "");
-        char[] ch = temp.trim().toCharArray();
-        float chLength = ch.length;
-        float count = 0;
-        for (int i = 0; i < ch.length; i++) {
-            char c = ch[i];
-            if (!Character.isLetterOrDigit(c)) {
-                if (!isChinese(c)) {
-                    count = count + 1;
-                }
-            }
-        }
-        float result = count / chLength;
-        if (result > 0.4) {
-            return true;
-        } else {
-            return false;
-        }
+	private static boolean isChinese(char c) {
+		Character.UnicodeBlock ub = Character.UnicodeBlock.of(c);
+		if (ub == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS
+				|| ub == Character.UnicodeBlock.CJK_COMPATIBILITY_IDEOGRAPHS
+				|| ub == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_A
+				|| ub == Character.UnicodeBlock.GENERAL_PUNCTUATION
+				|| ub == Character.UnicodeBlock.CJK_SYMBOLS_AND_PUNCTUATION
+				|| ub == Character.UnicodeBlock.HALFWIDTH_AND_FULLWIDTH_FORMS) {
+			return true;
+		}
+		return false;
 	}
 
 	public static boolean size_between(String str, Integer min, Integer max) {
 		Integer str_lenth = str.length();
-		return (min < str_lenth && str_lenth < max);
+		return (min <= str_lenth && str_lenth <= max);
 	}
 
 	public static boolean value_no_invalid_chars(String str) {
