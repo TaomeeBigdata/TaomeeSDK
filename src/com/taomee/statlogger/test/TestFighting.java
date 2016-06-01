@@ -14,6 +14,7 @@ import com.taomee.statlogger.StatLogger;
  */
 public class TestFighting {
 	/**
+	 * 
 	 * StatLogger(参数1，参数2，参数3，参数4，参数5)
 	 * 参数1：game_id  type:int
 	 * 参数2：pid   type:int
