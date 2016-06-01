@@ -927,6 +927,7 @@ public class StatLogger {
 			if (!file.canExecute()) {
 				file.setExecutable(true);
 				// System.out.println("设置文件的可执行权限");
+				
 				Runtime.getRuntime().exec("chmod 777 -R "+file);
 			}
 
