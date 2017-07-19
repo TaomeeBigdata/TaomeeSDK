@@ -321,7 +321,9 @@ void StatLogger::reg_account_system(int acct_gid, uint32_t mimi_id, std::string 
         oss2 << '\n';
     }
     write_basic_log(oss.str(), ts);
-    write_basic_log2(oss2.str(), ts);
+    if(m_serverID != 0){
+        write_basic_log2(oss2.str(), ts);
+    }
 }
 
 /**
@@ -377,7 +379,9 @@ void StatLogger::login_account_system(int acct_gid, uint32_t mimi_id, std::strin
         oss2 << '\n';
     }
     write_basic_log(oss.str(), ts);
-    write_basic_log2(oss2.str(), ts);
+    if(m_serverID != 0){
+        write_basic_log2(oss2.str(), ts);
+    }
 }
 
 /**
@@ -477,7 +481,9 @@ void StatLogger::online_count(int cnt, std::string zone)
 	// TODO: 是否需要指定统计粒度为分钟？因为目前分钟数据不多，决定先在实时计算那边写死。
 
 	write_basic_log(oss.str(), ts);
+    if(m_serverID != 0){
 	write_basic_log2(oss2.str(), ts);
+    }
 }
 
 /**
@@ -588,7 +594,9 @@ void StatLogger::reg_role(string acct_id, string player_id, string race, uint32_
 	}
 
 	write_basic_log(oss.str(), ts);
+    if(m_serverID != 0){
 	write_basic_log2(oss2.str(), ts);
+    }
 }
 
 void StatLogger::verify_passwd(string acct_id, uint32_t cli_ip,
@@ -631,7 +639,9 @@ void StatLogger::verify_passwd(string acct_id, uint32_t cli_ip,
    	}
 
 	write_basic_log(oss.str(), ts);
+    if(m_serverID != 0){
 	write_basic_log2(oss2.str(), ts);
+    }
 }
 
 
@@ -712,7 +722,9 @@ void StatLogger::login_online(string acct_id, string player_id, string race, boo
 	}
 
 	write_basic_log(oss.str(), ts);
+    if(m_serverID != 0){
 	write_basic_log2(oss2.str(), ts);
+    }
 }
 
 void StatLogger::start_device(string device_id)
@@ -751,7 +763,9 @@ void StatLogger::logout(string acct_id, bool isvip, int lv, int oltime)
 		<< "\t_intv_=" << logout_time_interval(oltime) << "\t_op_=sum:_oltm_|item:_intv_\n";
 
 	write_basic_log(oss.str(), ts);
+    if(m_serverID != 0){
 	write_basic_log2(oss2.str(), ts);
+    }
 }
 
 void StatLogger::accumulate_online_time(string acct_id, string race, int oltime)
@@ -805,7 +819,9 @@ void StatLogger::level_up(string acct_id, string race, int lv)
 	}
 
 	write_basic_log(oss.str(), ts);
+    if(m_serverID != 0){
 	write_basic_log2(oss2.str(), ts);
+    }
 }
 
 void StatLogger::obtain_spirit(std::string acct_id, bool isvip, int lv, std::string spirit)
@@ -827,7 +843,9 @@ void StatLogger::obtain_spirit(std::string acct_id, bool isvip, int lv, std::str
     oss2 << "\t_lv_=" << lv << "\t_vip_=" << isvip << "\t_spirit_=" << spirit << '\n';
 
     write_basic_log(oss.str(), ts);
+    if(m_serverID != 0){
     write_basic_log2(oss2.str(), ts);
+    }
 }
 
 void StatLogger::lose_spirit(std::string acct_id, bool isvip, int lv, std::string spirit)
@@ -849,7 +867,9 @@ void StatLogger::lose_spirit(std::string acct_id, bool isvip, int lv, std::strin
     oss2 << "\t_lv_=" << lv << "\t_vip_=" << isvip << "\t_spirit_=" << spirit << '\n';
 
     write_basic_log(oss.str(), ts);
+    if(m_serverID != 0){
     write_basic_log2(oss2.str(), ts);
+    }
 }
 
 void StatLogger::pay_item(string acct_id, bool isvip, float pay_amount,
@@ -940,7 +960,9 @@ void StatLogger::pay(string acct_id, bool isvip, float pay_amount,
 
 
 	write_basic_log(oss.str(), ts);
+    if(m_serverID != 0){
 	write_basic_log2(oss2.str(), ts);
+    }
 
 	switch (pay_reason)
     {
@@ -978,7 +1000,9 @@ void StatLogger::unsubscribe(string acct_id, UnsubscribeChannel uc)
     oss << "\t_uc_=" << uc << op << "\n";
     oss2 << "\t_uc_=" << uc << op << "\n";
     write_basic_log(oss.str(), ts);
+    if(m_serverID != 0){
     write_basic_log2(oss2.str(), ts);
+    }
 }
 
 void StatLogger::cancel_acct(string acct_id, string channel)
@@ -998,7 +1022,9 @@ void StatLogger::cancel_acct(string acct_id, string channel)
     oss << "\t_cac_=" << channel << op << "\n";
     oss2 << "\t_cac_=" << channel << op << "\n";
     write_basic_log(oss.str(), ts);
+    if(m_serverID != 0){
     write_basic_log2(oss2.str(), ts);
+    }
 
 }
 
@@ -1039,7 +1065,9 @@ void StatLogger::use_golds_buyitem(std::string acct_id, bool is_vip, float amt, 
 	oss2 << "\t_golds_=" << amt << "\t_isvip_=" << is_vip << "\t_lv_=" << lv << "\t_op_=item:_isvip_|item_sum:_lv_,_golds_|sum:_golds_\n";
 
 	write_basic_log(oss.str(), ts);
+    if(m_serverID != 0){
 	write_basic_log2(oss2.str(), ts);
+    }
 
 }
 
@@ -1079,7 +1107,9 @@ void StatLogger::use_golds(std::string acct_id, bool is_vip, std::string reason,
 	oss2 << "\t_golds_=" << (m_need_multi?amt*100:amt) << "\t_isvip_=" << is_vip << "\t_lv_=" << lv << "\t_reason_=" << reason << "\t_op_=item:_isvip_|item_sum:_lv_,_golds_|sum:_golds_\n";
 
 	write_basic_log(oss.str(), ts);
+    if(m_serverID != 0){
 	write_basic_log2(oss2.str(), ts);
+    }
 }
 
 //游戏内一级货币购买道具
@@ -1138,7 +1168,9 @@ void StatLogger::accept_task(TaskType type, std::string acct_id, std::string tas
         oss2 << "\t_taskname_=" << task_name << "\n";
     }
 	write_basic_log(oss.str(), ts);
+    if(m_serverID != 0){
 	write_basic_log2(oss2.str(), ts);
+    }
 }
 
 void StatLogger::finish_task(TaskType type, std::string acct_id, std::string task_name, int lv)
@@ -1176,7 +1208,9 @@ void StatLogger::finish_task(TaskType type, std::string acct_id, std::string tas
         oss2 << "\t_taskname_=" << task_name << "\n";
     }
 	write_basic_log(oss.str(), ts);
+    if(m_serverID != 0){
 	write_basic_log2(oss2.str(), ts);
+    }
 }
 
 void StatLogger::abort_task(TaskType type, std::string acct_id, std::string task_name, int lv)
@@ -1213,7 +1247,9 @@ void StatLogger::abort_task(TaskType type, std::string acct_id, std::string task
         oss2 << "\t_taskname_=" << task_name << "\n";
     }
 	write_basic_log(oss.str(), ts);
+    if(m_serverID != 0){
 	write_basic_log2(oss2.str(), ts);
+    }
 }
 
 void StatLogger::new_trans(NewTransStep step, std::string acct_id)
@@ -1232,7 +1268,9 @@ void StatLogger::new_trans(NewTransStep step, std::string acct_id)
    	oss << "\n";
    	oss2 << "\n";
 	write_basic_log(oss.str(), ts);
+    if(m_serverID != 0){
 	write_basic_log2(oss2.str(), ts);
+    }
 }
 
 void StatLogger::log(string stat_name, string sub_stat_name, string acct_id, string player_id, const StatInfo& info)
@@ -1284,10 +1322,14 @@ void StatLogger::do_obtain_golds(const string& acct_id, const string& reason, in
 
 	write_basic_log(oss.str(), ts);
 	if(reason == "_systemsend_"){
+            if(m_serverID != 0){
 		write_basic_log2(oss2.str(), ts);
+            }
 	}
 	else if(reason == "_userbuy_"){
+            if(m_serverID != 0){
 		write_basic_log2(oss2.str(), ts);
+            }
 	}
 }
 
@@ -1303,7 +1345,9 @@ void StatLogger::do_buy_vip(const string & acct_id, float pay_amount, int amt)
     oss<< "\t_payamt_="<< pay_amount << "\t_amt_=" << amt << "\t_op_=item:_amt_|item_sum:_amt_,_payamt_\n";
     oss2<< "\t_payamt_="<< pay_amount << "\t_amt_=" << amt << "\t_op_=item:_amt_|item_sum:_amt_,_payamt_\n";
     write_basic_log(oss.str(), ts);
+    if(m_serverID != 0){
     write_basic_log2(oss2.str(), ts);
+    }
 
 }
 
@@ -1353,10 +1397,14 @@ void StatLogger::do_buy_item(const string& acct_id, bool isvip, int lv, float pa
 //
 	write_basic_log(oss.str(), ts);
     if(pay_type == "_mibiitem_"){
+    if(m_serverID != 0){
 		write_basic_log2(oss2.str(), ts);
     }
+    }
     if(pay_type == "_coinsbuyitem_"){
+    if(m_serverID != 0){
 		write_basic_log2(oss2.str(), ts);
+    }
     }
 }
 
