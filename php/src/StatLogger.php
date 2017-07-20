@@ -240,11 +240,15 @@ class StatLogger {
      * @param site_id 平台ID 默认 -1表示该游戏不会拿出去放在不同的平台上运营  1：表示淘米平台
      * @param is_game 是否游戏后台络的数据
      */
-    public function __construct($game, $zone = -1, $svr = -1, $site = -1, $isgame = 1) {
-        $path = "/opt/taomee/stat/data";
+    public function __construct($serverID, $game, $zone = -1, $svr = -1, $site = -1, $isgame = 1) {
+        $path = "c:/opt/taomee/stat/data";
+        $path2 = "c:/opt/taomee/stat/tmsdata";
         if(!(StatCommon::stat_makedir($path + "/inbox")))  return;
+        if(!(StatCommon::stat_makedir($path2 + "/inbox")))  return;
         $this->m_path = $path;
+        $this->m_path2 = $path2;
 
+        $this->m_serverID = $serverID;
         $this->m_appid = $game;
         $this->m_siteid = $site;
         $this->m_zoneid = $zone;
@@ -263,8 +267,10 @@ class StatLogger {
             }
 
         $this->m_basic_fd = false;
+        $this->m_basic_fd2 = false;
         $this->m_custom_fd = false;
         $this->m_basic_ts  = 0;
+        $this->m_basic_ts2  = 0;
         $this->m_custom_ts = 0;
 
         $this->m_hostip = StatCommon::stat_get_ip_addr();
@@ -291,16 +297,22 @@ class StatLogger {
         $ts = time();
 
         $oss = "";
+        $oss2 = "";
 
         $this->set_basic_info($oss, "_olcnt_", "_olcnt_", $ts, "-1");
+        $this->set_basic_info2($oss2, 9, $ts, "-1");
 
         if(strlen($zone) == 0) {
             $zone = "_all_";
         }
 
         $oss = $oss."\t_zone_=".$zone."\t_olcnt_=".$cnt."\t_op_=item_max:_zone_,_olcnt_\n";
+        $oss2 = $oss2."\t_zone_=".$zone."\t_olcnt_=".$cnt."\t_op_=item_max:_zone_,_olcnt_\n";
 
         $this->write_basic_log($oss, $ts);
+        if($this->m_serverID != 0){
+            $this->write_basic_log2($oss2, $ts);
+        }
     }
 
     /**
@@ -341,36 +353,49 @@ class StatLogger {
         $ts = time();
         $op = "\t_op_=";
         $oss = "";
+        $oss2 = "";
 
         $this->set_basic_info($oss, "_newac_", "_newac_", $ts, $acct);
+        $this->set_basic_info2($oss2, 2, $ts, $acct);
         $this->set_device_info($oss, $op, $ads, $browser, $device, $os, $resolution, $network, $isp);
+        $this->set_device_info($oss2, $op, $ads, $browser, $device, $os, $resolution, $network, $isp);
 
         if(strlen($cli_ip) != 0 && $this->is_valid_ip($cli_ip)) {
             $oss .= ("\t_cip_=".$cli_ip);
+            $oss2 .= ("\t_cip_=".$cli_ip);
             $op .= ("ip_distr:_cip_|");
         }
 
         if(strlen($op) > 6) {
             $op = substr($op, 0, strlen($op) - 1);
             $oss .= ($op."\n");
+            $oss2 .= ($op."\n");
         } else {
             $oss .= "\n";
+            $oss2 .= "\n";
         }
         //角色新增
         if(strlen($player_id)) {
             if(!$this->is_valid_playerid($player_id))   return;
             $this->set_basic_info($oss, "_newpl_", "_newpl_", $ts, $acct_id, $player_id);
+            $this->set_basic_info2($oss2, 3, $ts, $acct_id, $player_id);
             $oss .= "\n";
+            $oss2 .= "\n";
         }
         //职业新增
         if(strlen($race)) {
             StatCommon::stat_trim_underscore($race);
             if(!$this->is_valid_race($race))    return;
             $this->set_basic_info($oss, "_newrace_", $race, $ts, $acct_id);
+            $this->set_basic_info2($oss2, 40, $ts, $acct_id);
             $oss .= "\n";
+            $oss2 .= ("\t_race_=".$race."\n");
         }
 
         $this->write_basic_log($oss, $ts);
+        if($this->m_serverID != 0){
+            $this->write_basic_log2($oss2, $ts);
+        }
     }
 
      /**
@@ -384,22 +409,31 @@ class StatLogger {
         $ts = time();
         $op = "\t_op_=";
         $oss = "";
+        $oss2 = "";
         $this->set_basic_info($oss, "_veripass_", "_veripass_", $ts, $acct_id);
+        $this->set_basic_info2($oss2, 1, $ts, $acct_id);
         $this->set_device_info($oss, $op, $ads_id, $browser, $device, $os, $resolution, $network, $isp);
+        $this->set_device_info($oss2, $op, $ads_id, $browser, $device, $os, $resolution, $network, $isp);
 
         if(strlen($cli_ip) != 0 && $this->is_valid_ip($cli_ip)) {
             $oss .= ("\t_cip_=".$cli_ip);
+            $oss2 .= ("\t_cip_=".$cli_ip);
             $op .= ("ip_distr:_cip_|");
         }
 
         if(strlen($op) > 6) {
             $op = substr($op, 0, strlen($op) - 1);
             $oss .= ($op."\n");
+            $oss2 .= ($op."\n");
         } else {
             $oss .= "\n";
+            $oss2 .= "\n";
         }
 
         $this->write_basic_log($oss, $ts);
+        if($this->m_serverID!=0){
+            $this->write_basic_log2($oss2, $ts);
+        }
     }
 
 	/**
@@ -418,43 +452,58 @@ class StatLogger {
             $op .= "item:_lv_|";
         }
         $oss = "";
+        $oss2 = "";
         //账号登陆
         $this->set_basic_info($oss, "_lgac_", "_lgac_", $ts, $acct_id);
+        $this->set_basic_info2($oss2, 5, $ts, $acct_id);
         $oss .= ("\t_vip_=".$this->convert_isvip($isvip)."\t_lv_=".$lv);
+        $oss2 .= ("\t_vip_=".$this->convert_isvip($isvip)."\t_lv_=".$lv);
         $this->set_device_info($oss, $op, $ads_id, $browser, $device, $os, $resolution, $network, $isp);
+        $this->set_device_info($oss2, $op, $ads_id, $browser, $device, $os, $resolution, $network, $isp);
 
         if(strlen($cli_ip) != 0 && $this->is_valid_ip($cli_ip)) {
             $oss .= ("\t_cip_=".$cli_ip);
+            $oss2 .= ("\t_cip_=".$cli_ip);
             $op .= ("ip_distr:_cip_|");
         }
 
         if(strlen($zone)) {//统计各区的登录人数
             StatCommon::stat_trim_underscore($zone);
             $oss .= ("\t_zone_=".$zone);
+            $oss2 .= ("\t_zone_=".$zone);
             $op .= "item:_zone_|";
         }
 
         if(strlen($op) > 6) {
             $op = substr($op, 0, strlen($op) - 1);
             $oss .= ($op."\n");
+            $oss2 .= ($op."\n");
         } else {
             $oss .= "\n";
+            $oss2 .= "\n";
         }
 
         if(strlen($player_id)) {//角色登陆
             if(!$this->is_valid_playerid($player_id))   return;
             $this->set_basic_info($oss, "_lgpl_", "_lgpl_", $ts, $acct_id, $player_id);
+            $this->set_basic_info2($oss2, 6, $ts, $acct_id, $player_id);
             $oss .= "\n";
+            $oss2 .= "\n";
         }
 
         if(strlen($race)) {//职业登陆
             StatCommon::stat_trim_underscore($race);
             if(!$this->is_valid_race($race))    return;
             $this->set_basic_info($oss, "_lgrace_", $race, $ts, $acct_id);
+            $this->set_basic_info2($oss2, 41, $ts, $acct_id);
             $oss .= ("\t_vip_=".$this->convert_isvip($isvip)."\t_lv_".$lv."\t_op_=item:_vip_|item:_lv_\n");
+            $oss2 .= ("\t_race_=".$race."\t_vip_=".$this->convert_isvip($isvip)."\t_lv_".$lv."\t_op_=item:_vip_|item:_lv_\n");
         }
 
         $this->write_basic_log($oss, $ts);
+        if($this->m_serverID != 0){
+        $this->write_basic_log2($oss2, $ts);
+        }
     }
 
     //手套启动设备
@@ -484,10 +533,16 @@ class StatLogger {
 
         $ts = time();
         $oss = "";
+        $oss2 = "";
         $this->set_basic_info($oss, "_logout_", "_logout_", $ts, $acct_id);
+        $this->set_basic_info2($oss2, 8, $ts, $acct_id);
         $oss .= ("\t_vip_=".$this->convert_isvip($isvip)."\t_lv_=".$lv."\t_oltm_=".$oltime."\t_intv_=".$this->logout_time_interval($oltime)."\t_op_=sum:_oltm_|item:_intv_\n");
+        $oss2 .= ("\t_vip_=".$this->convert_isvip($isvip)."\t_lv_=".$lv."\t_oltm_=".$oltime."\t_intv_=".$this->logout_time_interval($oltime)."\t_op_=sum:_oltm_|item:_intv_\n");
 
         $this->write_basic_log($oss, $ts);
+        if($this->m_serverID != 0){
+        $this->write_basic_log2($oss2, $ts);
+        }
     }
 
 	/**
@@ -502,18 +557,26 @@ class StatLogger {
 
         $ts = time();
         $oss = "";
+        $oss2 = "";
         //账号等级变化
         $this->set_basic_info($oss, "_aclvup_", "_aclvup_", $ts, $acct_id);
+        $this->set_basic_info2($oss2, 10, $ts, $acct_id);
         $oss .= ("\t_lv_=".$this->convert_isvip($isvip)."\t_op_=set_distr:_lv_\n");
+        $oss2 .= ("\t_lv_=".$this->convert_isvip($isvip)."\t_op_=set_distr:_lv_\n");
         //职业等级变化
         if(strlen($race)) {
             StatCommon::stat_trim_underscore($race);
             if(!$this->is_valid_race($race))    return;
             $this->set_basic_info($oss, "_racelvup_", $race, $ts, $acct_id);
+            $this->set_basic_info2($oss2, 11, $ts, $acct_id);
             $oss .= ("\t_lv_=".$this->convert_isvip($isvip)."\t_op_=set_distr:_lv_\n");
+            $oss2 .= ("\t_race_=".$race."\t_lv_=".$this->convert_isvip($isvip)."\t_op_=set_distr:_lv_\n");
         }
 
         $this->write_basic_log($oss, $ts);
+        if($this->m_serverID != 0){
+        $this->write_basic_log2($oss2, $ts);
+        }
     }
 
 	/**
@@ -528,11 +591,17 @@ class StatLogger {
 
         $ts = time();
         $oss = "";
+        $oss2 = "";
         StatCommon::stat_trim_underscore($spirit);
         $this->set_basic_info($oss, "_obtainspirit_", "_obtainspirit_", $ts, $acct_id);
+        $this->set_basic_info2($oss2, 20, $ts, $acct_id);
         $oss .= ("\t_lv_=".$this->convert_isvip($isvip)."\t_spirit_=".$spirit."\n");
+        $oss2 .= ("\t_lv_=".$this->convert_isvip($isvip)."\t_spirit_=".$spirit."\n");
 
         $this->write_basic_log($oss, $ts);
+        if($this->m_serverID != 0){
+        $this->write_basic_log2($oss2, $ts);
+        }
     }
 
 	/**
@@ -547,11 +616,17 @@ class StatLogger {
 
         $ts = time();
         $oss = "";
+        $oss2 = "";
         StatCommon::stat_trim_underscore($spirit);
         $this->set_basic_info($oss, "_losespirit_", "_losespirit_", $ts, $acct_id);
+        $this->set_basic_info2($oss2, 21, $ts, $acct_id);
         $oss .= ("\t_lv_=".$this->convert_isvip($isvip)."\t_spirit_=".$spirit."\n");
+        $oss2 .= ("\t_lv_=".$this->convert_isvip($isvip)."\t_spirit_=".$spirit."\n");
 
         $this->write_basic_log($oss, $ts);
+        if($this->m_serverID != 0){
+        $this->write_basic_log2($oss2, $ts);
+        }
     }
 
     /**
@@ -570,13 +645,18 @@ class StatLogger {
         $op = "\t_op_=sum:_amt_";
         $oss = "";
         $this->set_basic_info($oss, "_mibiitem_", "_mibiitem_", $ts, $acct_id);
+        $this->set_basic_info2($oss2, 76, $ts, $acct_id);
         $oss .= ("\t_vip_=".$this->convert_isvip($isvip)."\t_amt_=".$pay_amount."\t_ccy_=".$currency.$op."\n");
+        $oss2 .= ("\t_vip_=".$this->convert_isvip($isvip)."\t_amt_=".$pay_amount."\t_ccy_=".$currency.$op."\n");
         $this->write_basic_log($oss, $ts);
+        if($this->m_serverID != 0){
+        $this->write_basic_log2($oss2, $ts);
+        }
     }
 
     /**
      * @brief 玩家每次在游戏内使用米币购买道具时调用
-     * @param outcome 付费获得的道具名称。如果pay_reason选择的是pay_buy，则outcome赋值为相应的“道具名字”；
+     * @param outcome （不能为空！）付费获得的道具名称。如果pay_reason选择的是pay_buy，则outcome赋值为相应的“道具名字”；
      *                如果pay_reason的值不是pay_buy，则本参数可以赋空字符串。
      * @param pay_channel 支付类型，如米币卡、米币帐户、支付宝、苹果官方、网银、手机付费等等，米币渠道传"1"。
      */
@@ -617,17 +697,41 @@ class StatLogger {
         //这里可以统计出付费总额(通常单个游戏，不应该出现多种货币单位)、VIP和非VIP用户付费总额、各种货币单位付费总额
         $op = "\t_op_=sum:_amt_|item_sum:_vip_,_amt_|item_sum:_paychannel_,_amt_|item_sum:_ccy_,_amt_|item:_paychannel_";
         $oss = "";
+        $oss2 = "";
         // 帐号付费 //不包含赠送渠道
         if($pay_reason != PayReason::PAY_FREE)
         {
             $this->set_basic_info($oss, "_acpay_", "_acpay_", $ts, $acct_id);
+            $this->set_basic_info2($oss2, 12, $ts, $acct_id);
             $oss .= ("\t_vip_=".$this->convert_isvip($isvip)."\t_amt_=".$pay_amount."\t_ccy_=".$currency."\t_paychannel_=".$pay_channel.$op."\n");
+            $oss2 .= ("\t_vip_=".$this->convert_isvip($isvip)."\t_amt_=".$pay_amount."\t_ccy_=".$currency."\t_paychannel_=".$pay_channel.$op."\n");
         }
 
         $this->set_basic_info($oss, "_acpay_", $reason, $ts, $acct_id);
+        switch($pay_reason) {
+            case PayReason::PAY_CHARGE :
+                $this->set_basic_info2($oss2, 38, $ts, $acct_id);
+                break;
+            case PayReason::PAY_VIP :
+                $this->set_basic_info2($oss2, 13, $ts, $acct_id);
+                break;
+            case PayReason::PAY_BUY:
+                $this->set_basic_info2($oss2, 14, $ts, $acct_id);
+                break;
+            case PayReason::PAY_FREE:
+                $this->set_basic_info2($oss2, 39, $ts, $acct_id);
+                break;
+            default:
+                $reason = "";
+                break;
+        }
         $oss .= ("\t_vip_=".$this->convert_isvip($isvip)."\t_amt_=".$pay_amount."\t_ccy_=".$currency."\t_paychannel_=".$pay_channel.$op."\n");
+        $oss2 .= ("\t_vip_=".$this->convert_isvip($isvip)."\t_amt_=".$pay_amount."\t_ccy_=".$currency."\t_paychannel_=".$pay_channel.$op."\n");
 
         $this->write_basic_log($oss, $ts);
+        if($this->m_serverID != 0){
+        $this->write_basic_log2($oss2, $ts);
+        }
 
         switch ($pay_reason)
         {
@@ -662,10 +766,16 @@ class StatLogger {
 
         $ts = time(0);
         $oss = "";
+        $oss2 = "";
         $op = "\t_op_=item:_uc_";
         $this->set_basic_info($oss, "_unsub_", "_unsub_", $ts, $acct_id);
+        $this->set_basic_info2($oss2, 22, $ts, $acct_id);
         $oss .= ("\t_uc_=".$uc.$op."\n");
+        $oss2 .= ("\t_uc_=".$uc.$op."\n");
         $this->write_basic_log($oss, $ts);
+        if($this->m_serverID != 0){
+        $this->write_basic_log2($oss2, $ts);
+        }
     }
 
     /**
@@ -682,10 +792,16 @@ class StatLogger {
 
         $ts = time(0);
         $oss = "";
+        $oss2 = "";
         $op = "\t_op_=item:_cac_";
         $this->set_basic_info($oss, "_ccacct_", "_ccacct_", $ts, $acct_id);
+        $this->set_basic_info2($oss2, 23, $ts, $acct_id);
         $oss .= ("\t_cac_=".$uc.$op."\n");
+        $oss2 .= ("\t_cac_=".$uc.$op."\n");
         $this->write_basic_log($oss, $ts);
+        if($this->m_serverID != 0){
+        $this->write_basic_log2($oss2, $ts);
+        }
     }
 
 	/**
@@ -726,13 +842,21 @@ class StatLogger {
 
         $ts = time();
         $oss = "";
+        $oss2 = "";
         $this->set_basic_info($oss, "_usegold_", "_usegold_", $ts, $acct_id);
+        $this->set_basic_info2($oss2, 36, $ts, $acct_id);
         $oss .= ("\t_golds_=".($this->m_need_multi?$amt*100:$amt)."\t_op_=sum:_golds_\n");
+        $oss2 .= ("\t_golds_=".($this->m_need_multi?$amt*100:$amt)."\t_op_=sum:_golds_\n");
 
         $this->set_basic_info($oss, "_usegold_", $reason, $ts, $acct_id);
+        $this->set_basic_info2($oss2, 75, $ts, $acct_id);
         $oss .= ("\t_golds_=".($this->m_need_multi?$amt*100:$amt)."\t_isvip_=".$is_vip."\t_lv_=".$lv."\t_op_=item:_isvip_|item_sum:_lv_,_golds_|sum:_golds_\n");
+        $oss2 .= ("\t_reason_=".$reason."\t_golds_=".($this->m_need_multi?$amt*100:$amt)."\t_isvip_=".$is_vip."\t_lv_=".$lv."\t_op_=item:_isvip_|item_sum:_lv_,_golds_|sum:_golds_\n");
 
         $this->write_basic_log($oss, $ts);
+        if($this->m_serverID != 0){
+        $this->write_basic_log2($oss2, $ts);
+        }
     }
 
 	/**
@@ -845,47 +969,85 @@ class StatLogger {
 
         $ts = time();
         $oss = "";
+        $oss2 = "";
         $this->set_basic_info($oss, "_usegold_", "_usegold_", $ts, $acct_id);
+        $this->set_basic_info2($oss2, 36, $ts, $acct_id);
         $oss .= ("\t_golds_=".$amt."\t_op_=sum:_golds_\n");
+        $oss2 .= ("\t_golds_=".$amt."\t_op_=sum:_golds_\n");
 
         $this->set_basic_info($oss, "_usegold_", "_buyitem_", $ts, $acct_id);
+        $this->set_basic_info2($oss2, 37, $ts, $acct_id);
         $oss .= ("\t_golds_=".$amt."\t_isvip_=".$this->convert_isvip($is_vip)."\t_lv_=".$lv."\t_op_=item:_isvip_|item_sum:_lv_,_golds_|sum:_golds_\n");
+        $oss2 .= ("\t_golds_=".$amt."\t_isvip_=".$this->convert_isvip($is_vip)."\t_lv_=".$lv."\t_op_=item:_isvip_|item_sum:_lv_,_golds_|sum:_golds_\n");
 
         $this->write_basic_log($oss, $ts);
+        if($this->m_serverID != 0){
+        $this->write_basic_log2($oss2, $ts);
+        }
     }
 
     private function do_obtain_golds($acct_id, $reason, $amt) {
         $ts = time();
         $oss = "";
+        $oss2 = "";
         // 帐号获得游戏金币
         $this->set_basic_info($oss, "_getgold_", $reason, $ts, $acct_id);
+        if($reason == "_userbuy_"){
+            $this->set_basic_info2($oss2, 35, $ts, $acct_id);
+        }else if($reason == "_systemsend_"){
+            $this->set_basic_info2($oss2, 17, $ts, $acct_id);
+        }
+        
         $oss .= ("\t_golds_=".$amt."\t_op_=sum:_golds_\n");
+        $oss2 .= ("\t_golds_=".$amt."\t_op_=sum:_golds_\n");
 
         $this->write_basic_log($oss, $ts);
+        if($this->m_serverID != 0){
+        $this->write_basic_log2($oss2, $ts);
+        }
     }
 
     private function do_buy_vip($acct_id, $pay_amount, $amt)
     {
         $ts = time(0);
         $oss;
+        $oss2;
         $this->set_basic_info($oss, "_buyvip_", "_buyvip_", $ts, $acct_id);
+        $this->set_basic_info2($oss2, 15, $ts, $acct_id);
         $oss .= ("\t_payamt_=".$pay_amount."\t_amt_=".$amt."\t_op_=item:_amt_|item_sum:_amt_,_payamt_\n");
+        $oss2 .= ("\t_payamt_=".$pay_amount."\t_amt_=".$amt."\t_op_=item:_amt_|item_sum:_amt_,_payamt_\n");
         $this->write_basic_log($oss, $ts);
+        if($this->m_serverID != 0){
+        $this->write_basic_log2($oss2, $ts);
+        }
     }
+    
     private function do_buy_item($acct_id, $isvip, $lv, $pay_amount, $pay_type, $outcome, $outcnt)
     {
         $ts = time(0);
         $oss = "";
+        $oss2 = "";
 
         $this->set_basic_info($oss, "_buyitem_", $pay_type, $ts, $acct_id);
+        if($pay_type=="_mibiitem_"){
+            $this->set_basic_info2($oss2, 16, $ts, $acct_id);
+        }
+        if($pay_type=="_coinsbuyitem_"){
+            $this->set_basic_info2($oss2, 18, $ts, $acct_id);
+        }
+        
         $op = "\t_op_=sum:_golds_";
         if($this->is_valid_lv($lv) && $lv != 0) {
             $op .= "|item:_lv_";
         }
 
         $oss .= ("\t_isvip_=".$isvip."\t_item_=".$outcome."\t_itmcnt_=".$outcnt."\t_golds_=".$pay_amount."\t_lv_=".$lv.$op."\n");
+        $oss2 .= ("\t_isvip_=".$isvip."\t_item_=".$outcome."\t_itmcnt_=".$outcnt."\t_golds_=".$pay_amount."\t_lv_=".$lv.$op."\n");
 
         $this->write_basic_log($oss, $ts);
+        if($this->m_serverID != 0){
+        $this->write_basic_log2($oss2, $ts);
+        }
     }
 
     private function do_task($type, $acct_id, $task_name, $lv, $step) {
@@ -905,15 +1067,22 @@ class StatLogger {
 
         $ts = time();
         $oss = "";
+        $oss2 = "";
 
         $this->set_basic_info($oss, $this->get_task_stid($type, $step), $task_name, $ts, $acct_id);
+        $this->set_basic_info2($oss2, $this->get_task_logID($type, $step), $ts, $acct_id);
         if($this->is_valid_lv($lv) && $lv > 0) {
             $oss .= ("\t_lv_=".$lv."\t_op_=item:_lv_\n");
+            $oss2 .= ("\t_taskname_=".$task_name."\t_lv_=".$lv."\t_op_=item:_lv_\n");
         } else {
             $oss .= "\n";
+            $oss2 .= ("\t_taskname_=".$task_name."\n");
         }
 
         $this->write_basic_log($oss, $ts);
+        if($this->m_serverID != 0){
+        $this->write_basic_log2($oss2, $ts);
+        }
     }
     
     private function logout_time_interval($tm) {
@@ -948,6 +1117,12 @@ class StatLogger {
         if(strlen($acct) == 0)  $acct = "-1";
         if(strlen($pid) == 0)   $pid = "-1";
         $oss .= ("_hip_=".$this->m_hostip."\t_stid_=".$stid."\t_sstid_=".$sstid."\t_gid_=".$this->m_appid."\t_zid_=".$this->m_zoneid."\t_sid_=".$this->m_svrid."\t_pid_=".$this->m_siteid."\t_ts_=".$ts."\t_acid_=".$acct."\t_plid_=".$pid);
+    }
+    
+    private function set_basic_info2(&$oss, $logID, $ts, $acct, $pid = "-1") {
+        if(strlen($acct) == 0)  $acct = "-1";
+        if(strlen($pid) == 0)   $pid = "-1";
+        $oss .= ("_hip_=".$this->m_hostip."\t_logid_=".$logID."\t_svrid_=".$this->m_serverID."\t_ts_=".$ts."\t_acid_=".$acct."\t_plid_=".$pid);
     }
     
     private function set_device_info(&$oss, &$op, $ads, $browser, $device, $os, $resolution, $network, $isp) {
@@ -1010,6 +1185,32 @@ class StatLogger {
             if(fwrite($this->m_basic_fd, $s) === false) {
                 $this->errlog("[write_baic_log]write(): ".$s);
                 $this->m_basic_fd = false;
+            }
+        }
+    }
+    
+    private function write_basic_log2($s, $ts) {
+        if($this->m_inited == 0) {
+            $this->errlog("object not inited");
+            return;
+        }
+
+        if(($ts < $this->m_basic_ts2) || (($ts - $this->m_basic_ts2) > 19) || ($this->m_basic_fd2 === false) || ((int)(($this->m_basic_ts2 + 28800)/86400) != (int)($ts + 28800)/86400)) {
+            @fclose($this->m_basic_fd2);
+            $this->m_basic_ts2 = $ts - ($ts % 20);
+            if($this->m_isgame) {
+                $oss = $this->m_path2."/inbox/".$this->m_appid."_game_basic_".$this->m_basic_ts2;
+            } else {
+                $oss = $this->m_path2."/inbox/".$this->m_appid."_account_basic_".$this->m_basic_ts2;
+            }
+            $this->m_basic_fd2 = @fopen($oss, "a");
+            if($this->m_basic_fd2 === false) {
+                $this->errlog("[write_basic_log]open(): ".$oss);
+            }
+            @chmod($oss, 0777);
+            if(fwrite($this->m_basic_fd2, $s) === false) {
+                $this->errlog("[write_baic_log]write(): ".$s);
+                $this->m_basic_fd2 = false;
             }
         }
     }
@@ -1123,6 +1324,10 @@ class StatLogger {
     private function get_task_stid($type, $stage) {
         return $this->task_stid[$type][$stage];
     }
+    
+    private function get_task_logID($type, $stage) {
+        return $this->task_logID[$type][$stage];
+    }
 
     private function get_new_trans_step($step) {
         return $this->new_trans_stid[$step];
@@ -1149,6 +1354,14 @@ class StatLogger {
         array( "_getauxtsk_", "_doneauxtsk_", "_abrtauxtsk_" ),
         array( "_getetctsk_", "_doneetctsk_", "_abrtetctsk_" )
     );
+    
+    private $task_logID = array(
+        array( "", "", "" ),
+        array( "42", "46", "50" ),
+        array( "43", "47", "51" ),
+        array( "44", "48", "52" ),
+        array( "45", "49", "53" )
+    );
 
     private $new_trans_stid = array(
         "",
@@ -1162,6 +1375,7 @@ class StatLogger {
     );
 
     //member
+    private $m_serverID;
     private $m_siteid;
     private $m_appid;
     private $m_isgame;
@@ -1169,9 +1383,12 @@ class StatLogger {
     private $m_svrid;
     private $m_ip;
     private $m_path;
+    private $m_path2;
     private $m_basic_fd;
+    private $m_basic_fd2;
     private $m_custom_fd;
     private $m_basic_ts;
+    private $m_basic_ts2;
     private $m_custom_ts;
     private $m_of;
     private $m_inited;
@@ -1268,30 +1485,69 @@ class NewTransStep
     const NW_END = 22;
 }
 
-//$info = new StatInfo();
-//$info->add_info("item", "首页点击");
-//$info->add_info("count", "1");
-//$info->add_op(OpCode::OP_UCOUNT, "item");
-//$info->add_op(OpCode::OP_SUM, "count");
-//$info->add_op(OpCode::OP_ITEM_SUM, "item", "count");
+// $info = new StatInfo();
+// $info->add_info("item", "首页点击");
+// $info->add_info("count", "1");
+// $info->add_op(OpCode::OP_UCOUNT, "item");
+// $info->add_op(OpCode::OP_SUM, "count");
+// $info->add_op(OpCode::OP_ITEM_SUM, "item", "count");
 #$info->serialize($s);
 #echo $s;
-//StatCommon::stat_mkdir("/opt/taomee/stat/data/spool/dsa/fg/o1h");
-$logger = new StatLogger(3);//1是游戏id
-//$logger->online_count(18);
-//$logger->reg_account(1932, "192.168.11.1", "", "chrome", "PC", "Linux", "1050*1600", "LAN", "tel");
-//$logger->reg_role(1932, 1, 1, "192.168.11.1", "", "chrome", "PC", "Linux", "1050*1600", "LAN", "tel");
-//$logger->verify_passwd("dkla");
-//$logger->login_online("dsakl", "", "1", 0, 10, "hahah", "hdhdh", "dsakl", "d12hjk", "dev");
-//$logger->logout("dhaslk", 0, 10, 100);
-//$logger->level_up("me", "monkey", 30);
-//$logger->obtain_spirit("you", 1, 10, "fhsjk");
-//$logger->lose_spirit("you", 0, 90, 7232);
-//$logger->pay_item(158456, 1, 10.1465, CurrencyType::CCY_MIBI, "精灵", 10);
-//$logger->new_trans(NewTransStep::bSendOnlineSucc, 10);
-//$logger->accept_task(TaskType::TASK_STORY, 10, "haha", 90);
-//$logger->log("seer", "web", 3215, "", $info);
-$logger->obtain_golds("me", 10);
-$logger->use_golds(478912, 0, "test", 1, 1);
-//$logger->pay(31267843, 0, 100, CurrencyType::CCY_MIBI, PayReason::PAY_BUY, "道具", 1, 1);
+// StatCommon::stat_mkdir("/opt/taomee/stat/data/spool/dsa/fg/o1h");
+$logger = new StatLogger(10,25);//1是游戏id
+$logger1 = new StatLogger(14,632,-1,-1,-1);
+$logger2 = new StatLogger(16,632,-1,-1,1);
+for($i=1;$i<=10000;$i++){
+    $logger->online_count(18);
+    $logger->reg_account(1932, "192.168.11.1", "", "chrome", "PC", "Linux", "1050*1600", "LAN", "tel");
+    $logger->reg_role(1932, 1, 1, "192.168.11.1", "", "chrome", "PC", "Linux", "1050*1600", "LAN", "tel");
+    $logger->verify_passwd("dkla");
+    $logger->login_online("dsakl", "", "1", 0, 10, "hahah", "hdhdh", "dsakl", "d12hjk", "dev");
+    $logger->logout("dhaslk", 0, 10, 100);
+    $logger->level_up("me", "monkey", 30);
+    $logger->obtain_spirit("you", 1, 10, "fhsjk");
+    $logger->lose_spirit("you", 0, 90, 7232);
+    $logger->pay_item(158456, 1, 10.1465, CurrencyType::CCY_MIBI, "精灵", 10);
+    $logger->new_trans(NewTransStep::bSendOnlineSucc, 10);
+    $logger->accept_task(TaskType::TASK_STORY, 10, "haha", 90);
+    $logger->log("seer", "web", 3215, "", $info);
+    $logger->obtain_golds("me", 10);
+    $logger->use_golds(478912, 0, "test", 1, 1);
+    $logger->pay(31267843, 0, 100, CurrencyType::CCY_MIBI, PayReason::PAY_BUY, "道具", 1, "频道");
+    $logger->pay(31267843, 0, 100, CurrencyType::CCY_MIBI, PayReason::PAY_VIP, "道具", 1, "频道");
+    $logger1->online_count(18);
+    $logger1->reg_account(1932, "192.168.11.1", "", "chrome", "PC", "Linux", "1050*1600", "LAN", "tel");
+    $logger1->reg_role(1932, 1, 1, "192.168.11.1", "", "chrome", "PC", "Linux", "1050*1600", "LAN", "tel");
+    $logger1->verify_passwd("dkla");
+    $logger1->login_online("dsakl", "", "1", 0, 10, "hahah", "hdhdh", "dsakl", "d12hjk", "dev");
+    $logger1->logout("dhaslk", 0, 10, 100);
+    $logger1->level_up("me", "monkey", 30);
+    $logger1->obtain_spirit("you", 1, 10, "fhsjk");
+    $logger1->lose_spirit("you", 0, 90, 7232);
+    $logger1->pay_item(158456, 1, 10.1465, CurrencyType::CCY_MIBI, "精灵", 10);
+    $logger1->new_trans(NewTransStep::bSendOnlineSucc, 10);
+    $logger1->accept_task(TaskType::TASK_STORY, 10, "haha", 90);
+    $logger1->log("seer", "web", 3215, "", $info);
+    $logger1->obtain_golds("me", 10);
+    $logger1->use_golds(478912, 0, "test", 1, 1);
+    $logger1->pay(31267843, 0, 100, CurrencyType::CCY_MIBI, PayReason::PAY_BUY, "道具", 1, "频道");
+    $logger2->pay(31267843, 0, 100, CurrencyType::CCY_MIBI, PayReason::PAY_VIP, "道具", 1, "频道");$logger1->online_count(18);
+    $logger2->reg_account(1932, "192.168.11.1", "", "chrome", "PC", "Linux", "1050*1600", "LAN", "tel");
+    $logger2->reg_role(1932, 1, 1, "192.168.11.1", "", "chrome", "PC", "Linux", "1050*1600", "LAN", "tel");
+    $logger2->verify_passwd("dkla");
+    $logger2->login_online("dsakl", "", "1", 0, 10, "hahah", "hdhdh", "dsakl", "d12hjk", "dev");
+    $logger2->logout("dhaslk", 0, 10, 100);
+    $logger2->level_up("me", "monkey", 30);
+    $logger2->obtain_spirit("you", 1, 10, "fhsjk");
+    $logger2->lose_spirit("you", 0, 90, 7232);
+    $logger2->pay_item(158456, 1, 10.1465, CurrencyType::CCY_MIBI, "精灵", 10);
+    $logger2->new_trans(NewTransStep::bSendOnlineSucc, 10);
+    $logger2->accept_task(TaskType::TASK_STORY, 10, "haha", 90);
+    $logger2->log("seer", "web", 3215, "", $info);
+    $logger2->obtain_golds("me", 10);
+    $logger2->use_golds(478912, 0, "test", 1, 1);
+    $logger2->pay(31267843, 0, 100, CurrencyType::CCY_MIBI, PayReason::PAY_BUY, "道具", 1, "频道");
+    $logger2->pay(31267843, 0, 100, CurrencyType::CCY_MIBI, PayReason::PAY_VIP, "道具", 1, "频道");
+    sleep(1);
+}
 ?>
