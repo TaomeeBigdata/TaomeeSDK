@@ -431,23 +431,30 @@ void StatLogger::custom_log(std::string acct_id, uint32_t stat_id, float value)
 
 	time_t ts = time(0);
 	ostringstream oss;
+	ostringstream oss2;
 	char buf[100];
 	string sstid;
 	sprintf(buf,"%u",stat_id);
 	sstid = buf;
 
 	set_basic_info(oss, "msgid_", sstid, ts, acct_id);
+	set_basic_info3(oss2, "msgid_", sstid, ts, acct_id);
 
 	if(value == 0) 
 	{
 		oss << '\n';
+		oss2 << '\n';
 		write_custom_log(oss.str(), ts);
+		write_custom_log2(oss2.str(), ts);
 	}
 	else
 	{
 		oss << "\t_value_=" << value;
+		oss2 << "\t_value_=" << value;
 		oss << '\n';
+		oss2 << '\n';
 		write_custom_log(oss.str(), ts);
+		write_custom_log2(oss2.str(), ts);
 	}
 }
 
@@ -477,7 +484,7 @@ void StatLogger::online_count(int cnt, std::string zone)
 	    zone = "_all_";
     }
     oss << "\t_zone_=" << zone << "\t_olcnt_=" << cnt << "\t_op_=item_max:_zone_,_olcnt_\n";
-    oss2 << "\t_zone_=" << zone << "\t_olcnt_=" << cnt << "\t_op_=item_max:_zone_,_olcnt_\n";
+    oss2 << "\t_gid_="<<m_appid<<"\t_zone_=" << zone << "\t_olcnt_=" << cnt << "\t_op_=item_max:_zone_,_olcnt_\n";
 	// TODO: 是否需要指定统计粒度为分钟？因为目前分钟数据不多，决定先在实时计算那边写死。
 
 	write_basic_log(oss.str(), ts);
@@ -1295,10 +1302,14 @@ void StatLogger::log(string stat_name, string sub_stat_name, string acct_id, str
     }
 	time_t ts = time(0);
 	ostringstream oss;
+	ostringstream oss2;
 	set_basic_info(oss, stat_name, sub_stat_name, ts, acct_id, player_id);
+	set_basic_info3(oss2, stat_name, sub_stat_name, ts, acct_id, player_id);
 	oss << info << '\n';
+	oss2 << info << '\n';
 
 	write_custom_log(oss.str(), ts);
+	write_custom_log2(oss2.str(), ts);
 }
 
 //-------------------------------------------
@@ -1468,6 +1479,16 @@ void StatLogger::set_basic_info2(ostringstream& oss, int logID,
 		<< "\t_plid_=" << (player_id.size() ? player_id : "-1");
 }
 
+void StatLogger::set_basic_info3(ostringstream& oss, const string& statname, const string& sub_statname,
+								time_t ts, const string& acct_id, const string& player_id) const
+{
+	oss << "_hip_=" << m_hostip << "\t_stid_=" << statname << "\t_sstid_=" << sub_statname
+	<< "\t_svrid_=" << m_serverID
+	<< "\t_gid_=" << m_appid << "\t_zid_=" << m_zoneid
+	<< "\t_sid_=" << m_svrid << "\t_pid_=" << m_siteid
+        << "\t_ts_=" << ts << "\t_acid_=" << (acct_id.size() ? acct_id: "-1")
+		<< "\t_plid_=" << (player_id.size() ? player_id : "-1");
+}
 
 void StatLogger::set_device_info(ostringstream& oss, string& op, const string& ads_id, const string& browser,
 									const string& device, const string& os, const string& resolution,
@@ -1974,14 +1995,14 @@ void StatLogger::write_custom_log2(const std::string& s, time_t ts)
 		m_custom_fd2 = open(oss.str().c_str(), O_WRONLY | O_APPEND | O_CREAT,
 							S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
 		if (m_custom_fd2 == -1) {
-			errlog(string("[write_custom_log]open(): ") + strerror(errno));
+			errlog(string("[write_custom_log2]open(): ") + strerror(errno));
 		}
 		fchmod(m_custom_fd2, 0777);
 		m_chksum1 = m_chksum2 = calc_checksum();
 	}
 
 	if (write(m_custom_fd2, s.c_str(), s.size()) == -1) {
-		errlog(string("[write_custom_log]write(): ") + strerror(errno));
+		errlog(string("[write_custom_log2]write(): ") + strerror(errno));
         close(m_custom_fd2);
 		m_custom_fd2 = -1;
 		m_chksum1 = m_chksum2 = calc_checksum();

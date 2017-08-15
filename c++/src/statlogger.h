@@ -455,6 +455,8 @@ private:
 						time_t ts, const std::string& acct_id, const std::string& player_id = "") const;
 	void set_basic_info2(std::ostringstream& oss, int logID,
 						time_t ts, const std::string& acct_id, const std::string& player_id = "") const;
+	void set_basic_info3(std::ostringstream& oss, const std::string& statname, const std::string& sub_statname,
+						time_t ts, const std::string& acct_id, const std::string& player_id = "") const;
 	void set_device_info(std::ostringstream& oss, std::string& op, const std::string& ads_id, const std::string& browser,
 							const std::string& device, const std::string& os, const std::string& resolution,
 							const std::string& network, const std::string& isp) const;
