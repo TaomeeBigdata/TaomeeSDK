@@ -743,10 +743,14 @@ void StatLogger::start_device(string device_id)
     }
 	time_t ts = time(0);
 	ostringstream oss;
+	ostringstream oss2;
 	// 帐号登录
 	set_basic_info(oss, "_startdev_", "_startdev_", ts, device_id);
+	set_basic_info2(oss2, 77, ts, device_id);
 	oss << '\n';
+	oss2 << '\n';
 	write_basic_log(oss.str(), ts);
+	write_basic_log2(oss2.str(), ts);
 }
 
 void StatLogger::logout(string acct_id, bool isvip, int lv, int oltime)
@@ -1309,7 +1313,9 @@ void StatLogger::log(string stat_name, string sub_stat_name, string acct_id, str
 	oss2 << info << '\n';
 
 	write_custom_log(oss.str(), ts);
-	write_custom_log2(oss2.str(), ts);
+	if(m_serverID != 0){
+		write_custom_log2(oss2.str(), ts);
+	}
 }
 
 //-------------------------------------------
