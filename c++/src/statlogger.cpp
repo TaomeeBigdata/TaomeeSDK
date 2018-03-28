@@ -64,15 +64,15 @@ void StatInfo::add_op(OpCode op, std::string key1, std::string key2)
 	MY_ASSERT(is_valid_op(op) && m_info.count(key1));
 
 	switch (op) {
-	case op_item_sum:
-	case op_item_max:
-	case op_item_set:
-		MY_ASSERT(m_info.count(key2));
-		key1 = key1 + "," + key2;
-		break;
-	default:
-		MY_ASSERT(key2.empty());
-		break;
+		case op_item_sum:
+		case op_item_max:
+		case op_item_set:
+			MY_ASSERT(m_info.count(key2));
+			key1 = key1 + "," + key2;
+			break;
+		default:
+			MY_ASSERT(key2.empty());
+			break;
 	}
 
 	m_ops[op].insert(key1);
@@ -106,7 +106,7 @@ void StatInfo::serialize(ostream& out) const
 			"sum:", "max:", "set:", "ucount:",
 			"item:", "item_sum:", "item_max:", "item_set:",
 			"sum_distr:", "max_distr:", "min_distr:",
-            "set_distr:",
+			"set_distr:",
 			"ip_distr:",
 			/* op_end */
 		};
@@ -126,12 +126,12 @@ void StatInfo::serialize(ostream& out) const
 void StatInfo::serialize_op(ostream& out, const char *op, const OpKey& keys) const
 {
 	OpKey::const_iterator it = keys.begin();
-    string vline;
+	string vline;
 	while (it != keys.end()) {
-        out<< vline;
-        out << op << *it;
-        vline = "|";
-        ++it;
+		out<< vline;
+		out << op << *it;
+		vline = "|";
+		++it;
 	}
 }
 
@@ -147,10 +147,10 @@ void StatInfo::serialize_op(ostream& out, const char *op, const OpKey& keys) con
 StatLogger::StatLogger()
 {
 	m_inited = 0;
-    strcpy(m_version, VERSION);
+	strcpy(m_version, VERSION);
 }
 
-StatLogger::StatLogger(int serverID, int game_id, int32_t zone_id, int32_t svr_id, int32_t site_id, int isgame)
+StatLogger::StatLogger(bool writeToTongji,bool writeToTms,int game_id, int32_t zone_id, int32_t svr_id, int32_t site_id, int isgame)
 {
 
 	// 创建保存统计数据的目录
@@ -165,7 +165,6 @@ StatLogger::StatLogger(int serverID, int game_id, int32_t zone_id, int32_t svr_i
 	path2.copy(m_path2, path2.size());
 	m_path2[path2.size()] = '\0';
 
-	m_serverID = serverID;//tms新的serverID
 	m_siteid = site_id;
 	m_zoneid = zone_id;
 	m_svrid  = svr_id;
@@ -178,23 +177,35 @@ StatLogger::StatLogger(int serverID, int game_id, int32_t zone_id, int32_t svr_i
 	m_custom_ts = 0;
 	m_custom_ts2 = 0;
 
+	m_writeToTongji=writeToTongji;
+	m_writeToTms=writeToTms;
+
 	m_magic_num1 = sc_magic1;
 	m_magic_num2 = sc_magic2;
 	m_magic_num3 = sc_magic3;
 
-    m_appid = game_id;
-    m_isgame = isgame;
-    if(game_id == 1 || game_id == 2 || game_id == 5 || game_id == 6 || game_id == 10 || game_id == 16 || game_id == 19) {
-        m_need_multi = false;
-    } else {
-        m_need_multi = true;
-    }
-//	app_id.copy(m_appid, app_id.size());
-//	m_appid[app_id.size()] = '\0';
+	m_appid = game_id;
+	m_isgame = isgame;
+	if(game_id == 1 || game_id == 2 || game_id == 5 || game_id == 6 || game_id == 10 || game_id == 16 || game_id == 19) {
+		m_need_multi = false;
+	} else {
+		m_need_multi = true;
+	}
+	//	app_id.copy(m_appid, app_id.size());
+	//	m_appid[app_id.size()] = '\0';
 
 	string ip = stat_get_ip_addr("eth1", 1);
 	if (ip.empty()) {
 		ip = stat_get_ip_addr("eth0", 1);
+	}
+	if (ip.empty()) {
+		ip = stat_get_ip_addr("bond0", 1);
+	}
+	if (ip.empty()) {
+		ip = stat_get_ip_addr("bond1", 1);
+	}
+	if(ip.empty()){
+		ip = "0.0.0.0";
 	}
 	MY_ASSERT(ip.size() && (ip.size() < sc_ip_sz));
 	ip.copy(m_hostip, ip.size());
@@ -216,7 +227,7 @@ StatLogger::~StatLogger()
 	m_custom_fd2 = -1;
 }
 
-void StatLogger::init(int serverID,int game_id, int32_t zone_id, int32_t svr_id, int32_t site_id, int isgame)
+void StatLogger::init(bool writeToTongji,bool writeToTms,int game_id, int32_t zone_id, int32_t svr_id, int32_t site_id, int isgame)
 {
 	// 创建保存统计数据的目录
 	string path = "/opt/taomee/stat/data";//默认统计数据一律写入该目录下
@@ -229,7 +240,9 @@ void StatLogger::init(int serverID,int game_id, int32_t zone_id, int32_t svr_id,
 	path2.copy(m_path2, path2.size());
 	m_path2[path2.size()] = '\0';
 
-	m_serverID = serverID;
+	m_writeToTongji=writeToTongji;
+	m_writeToTms=writeToTms;
+
 	m_siteid = site_id;
 	m_zoneid = zone_id;
 	m_svrid  = svr_id;
@@ -246,17 +259,26 @@ void StatLogger::init(int serverID,int game_id, int32_t zone_id, int32_t svr_id,
 	m_magic_num2 = sc_magic2;
 	m_magic_num3 = sc_magic3;
 
-    m_appid = game_id;
-    m_isgame = isgame;
-    if(game_id == 1 || game_id == 2 || game_id == 5 || game_id == 6 || game_id == 10 || game_id == 16 || game_id == 19) {
-        m_need_multi = false;
-    } else {
-        m_need_multi = true;
-    }
+	m_appid = game_id;
+	m_isgame = isgame;
+	if(game_id == 1 || game_id == 2 || game_id == 5 || game_id == 6 || game_id == 10 || game_id == 16 || game_id == 19) {
+		m_need_multi = false;
+	} else {
+		m_need_multi = true;
+	}
 
 	string ip = stat_get_ip_addr("eth1", 1);
 	if (ip.empty()) {
 		ip = stat_get_ip_addr("eth0", 1);
+	}
+	if (ip.empty()) {
+		ip = stat_get_ip_addr("bond0", 1);
+	}
+	if (ip.empty()) {
+		ip = stat_get_ip_addr("bond1", 1);
+	}
+	if(ip.empty()){
+		ip = "0.0.0.0";
 	}
 	MY_ASSERT(ip.size() && (ip.size() < sc_ip_sz));
 	ip.copy(m_hostip, ip.size());
@@ -278,52 +300,55 @@ void StatLogger::init(int serverID,int game_id, int32_t zone_id, int32_t svr_id,
  * @param acct_id
  */
 void StatLogger::reg_account_system(int acct_gid, uint32_t mimi_id, std::string tad, uint32_t cli_ip, 
-									GameType game_type, RegType acct_type, std::string acct_id)
+		GameType game_type, RegType acct_type, std::string acct_id)
 {
 	MY_ASSERT((m_appid == 169) && verify_checksum());
 	check_valid_key(acct_id);
 	check_valid_key(tad);
 
-    time_t ts = time(0);
-    string op("\t_op_=");
-    ostringstream oss;
-    ostringstream oss2;
+	time_t ts = time(0);
+	string op("\t_op_=");
+	ostringstream oss;
+	ostringstream oss2;
 	string stid = "_regacct_", sstid = "_regacct_";
 
-    set_user_info_reg(oss, stid, sstid, ts, mimi_id, op, tad, cli_ip, game_type, acct_type, acct_id, acct_gid, 0);
-    set_user_info_reg2(oss2, 33, ts, mimi_id, op, tad, cli_ip, game_type, acct_type, acct_id, acct_gid, 0);
+	set_user_info_reg(oss, stid, sstid, ts, mimi_id, op, tad, cli_ip, game_type, acct_type, acct_id, acct_gid, 0);
+	set_user_info_reg2(oss2, 33, ts, mimi_id, op, tad, cli_ip, game_type, acct_type, acct_id, acct_gid, 0);
 
-    if(op.size() > 6)
-    {
-        op.erase(op.size() - 1, 1);
-        oss << op << '\n';
-        oss2 << op << '\n';
-    }
-    else
-    {
-        oss << '\n';
-        oss2 << '\n';
-    }
+	if(op.size() > 6)
+	{
+		op.erase(op.size() - 1, 1);
+		oss << op << '\n';
+		oss2 << op << '\n';
+	}
+	else
+	{
+		oss << '\n';
+		oss2 << '\n';
+	}
 
 	op="\t_op_=";
 	set_user_info_reg(oss, stid, sstid, ts, mimi_id, op, tad, cli_ip, game_type, acct_type, acct_id, acct_gid, 1);
 	set_user_info_reg2(oss2, 33, ts, mimi_id, op, tad, cli_ip, game_type, acct_type, acct_id, acct_gid, 1);
 
-    if(op.size() > 6)
-    {
-        op.erase(op.size() - 1, 1);
-        oss << op << '\n';
-        oss2 << op << '\n';
-    }
-    else
-    {
-        oss << '\n';
-        oss2 << '\n';
-    }
-    write_basic_log(oss.str(), ts);
-    if(m_serverID != 0){
-        write_basic_log2(oss2.str(), ts);
-    }
+	if(op.size() > 6)
+	{
+		op.erase(op.size() - 1, 1);
+		oss << op << '\n';
+		oss2 << op << '\n';
+	}
+	else
+	{
+		oss << '\n';
+		oss2 << '\n';
+	}
+
+	if(m_writeToTongji){
+		write_basic_log(oss.str(), ts);
+	}
+	if(m_writeToTms){
+		write_basic_log2(oss2.str(), ts);
+	}
 }
 
 /**
@@ -337,51 +362,57 @@ void StatLogger::reg_account_system(int acct_gid, uint32_t mimi_id, std::string 
  * @param acct_id
  */
 void StatLogger::login_account_system(int acct_gid, uint32_t mimi_id, std::string tad, uint32_t cli_ip, 
-									GameType game_type, LoginType acct_type, std::string acct_id)
+		GameType game_type, LoginType acct_type, std::string acct_id)
 {
 	MY_ASSERT((m_appid == 169) && verify_checksum());
 	check_valid_key(acct_id);
 	check_valid_key(tad);
 
-    time_t ts = time(0);
-    string op("\t_op_=");
-    ostringstream oss;
-    ostringstream oss2;
+	time_t ts = time(0);
+	string op("\t_op_=");
+	ostringstream oss;
+	ostringstream oss2;
 	string stid = "_loginacct_", sstid = "_loginacct_";
 
-    set_user_info_login(oss, stid, sstid, ts, mimi_id, op, tad, cli_ip, game_type, acct_type, acct_id, acct_gid, 0);
-    set_user_info_login2(oss2, 32, ts, mimi_id, op, tad, cli_ip, game_type, acct_type, acct_id, acct_gid, 0);
+	set_user_info_login(oss, stid, sstid, ts, mimi_id, op, tad, cli_ip, game_type, acct_type, acct_id, acct_gid, 0);
+	set_user_info_login2(oss2, 32, ts, mimi_id, op, tad, cli_ip, game_type, acct_type, acct_id, acct_gid, 0);
 
-    if(op.size() > 6)
-    {
-        op.erase(op.size() - 1, 1);
-        oss << op << '\n';
-        oss2 << op << '\n';
-    }
-    else
-    {
-        oss << '\n';
-    }
+	if(op.size() > 6)
+	{
+		op.erase(op.size() - 1, 1);
+		oss << op << '\n';
+		oss2 << op << '\n';
+	}
+	else
+	{
+		oss << '\n';
+	}
 
 	op = "\t_op_=";
 	set_user_info_login(oss, stid, sstid, ts, mimi_id, op, tad, cli_ip, game_type, acct_type, acct_id, acct_gid, 1);
 	set_user_info_login2(oss2, 32, ts, mimi_id, op, tad, cli_ip, game_type, acct_type, acct_id, acct_gid, 1);
 
-    if(op.size() > 6)
-    {
-        op.erase(op.size() - 1, 1);
-        oss << op << '\n';
-        oss2 << op << '\n';
-    }
-    else
-    {
-        oss << '\n';
-        oss2 << '\n';
-    }
-    write_basic_log(oss.str(), ts);
-    if(m_serverID != 0){
-        write_basic_log2(oss2.str(), ts);
-    }
+	if(op.size() > 6)
+	{
+		op.erase(op.size() - 1, 1);
+		oss << op << '\n';
+		oss2 << op << '\n';
+	}
+	else
+	{
+		oss << '\n';
+		oss2 << '\n';
+	}
+
+
+	if(m_writeToTongji){
+		write_basic_log(oss.str(), ts);
+	}
+	if(m_writeToTms){
+		write_basic_log2(oss2.str(), ts);
+	}
+
+
 }
 
 /**
@@ -408,8 +439,8 @@ void StatLogger::frozen_account_process(uint32_t mimi_id, std::string stid, std:
 {
 	MY_ASSERT((m_appid == 169) && verify_checksum());
 
-    time_t ts = time(0);
-    ostringstream oss;
+	time_t ts = time(0);
+	ostringstream oss;
 	char buf[100];
 	string uid;
 	sprintf(buf,"%u",mimi_id);
@@ -418,7 +449,7 @@ void StatLogger::frozen_account_process(uint32_t mimi_id, std::string stid, std:
 	set_basic_info(oss, stid, sstid, ts, uid);
 	oss << '\n';
 
-    write_basic_log(oss.str(), ts);
+	write_basic_log(oss.str(), ts);
 }
 
 /**
@@ -476,21 +507,26 @@ void StatLogger::online_count(int cnt, std::string zone)
 	set_basic_info(oss, "_olcnt_", "_olcnt_", ts, "-1");
 	set_basic_info2(oss2, 9, ts, "-1");
 
-    if(zone.size())
-    {
-    }
-    else
-    {
-	    zone = "_all_";
-    }
-    oss << "\t_zone_=" << zone << "\t_olcnt_=" << cnt << "\t_op_=item_max:_zone_,_olcnt_\n";
-    oss2 << "\t_gid_="<<m_appid<<"\t_zone_=" << zone << "\t_olcnt_=" << cnt << "\t_op_=item_max:_zone_,_olcnt_\n";
+	if(zone.size())
+	{
+	}
+	else
+	{
+		zone = "_all_";
+	}
+	oss << "\t_zone_=" << zone << "\t_olcnt_=" << cnt << "\t_op_=item_max:_zone_,_olcnt_\n";
+	oss2 << "\t_gid_="<<m_appid<<"\t_zone_=" << zone << "\t_olcnt_=" << cnt << "\t_op_=item_max:_zone_,_olcnt_\n";
 	// TODO: 是否需要指定统计粒度为分钟？因为目前分钟数据不多，决定先在实时计算那边写死。
 
-	write_basic_log(oss.str(), ts);
-    if(m_serverID != 0){
-	write_basic_log2(oss2.str(), ts);
-    }
+
+
+	if(m_writeToTongji){
+		write_basic_log(oss.str(), ts);
+	}
+	if(m_writeToTms){
+		write_basic_log2(oss2.str(), ts);
+	}
+	
 }
 
 /**
@@ -507,51 +543,51 @@ void StatLogger::online_count(int cnt, std::string zone)
  * @param isp
  */
 void StatLogger::reg_account(std::string acct_id, uint32_t cli_ip, std::string ads_id, std::string browser,
-                            std::string device, std::string os, std::string resolution,
-                            std::string network, std::string isp)
+		std::string device, std::string os, std::string resolution,
+		std::string network, std::string isp)
 {
-    MY_ASSERT(verify_checksum());
+	MY_ASSERT(verify_checksum());
 
-    if(acct_id.size() == 0)
-    {
-        acct_id = "-1";
-    }
+	if(acct_id.size() == 0)
+	{
+		acct_id = "-1";
+	}
 
-    time_t ts = time(0);
-    string op("\t_op_=");
-    ostringstream oss;
-    // 帐号新增
-    set_basic_info(oss, "_newuid_", "_newuid_", ts, acct_id);
+	time_t ts = time(0);
+	string op("\t_op_=");
+	ostringstream oss;
+	// 帐号新增
+	set_basic_info(oss, "_newuid_", "_newuid_", ts, acct_id);
 
-    set_device_info(oss, op, ads_id, browser, device, os, resolution, network, isp);
+	set_device_info(oss, op, ads_id, browser, device, os, resolution, network, isp);
 
-    if(cli_ip != 0)
-    {
-        oss << "\t_cip_=" << cli_ip;
-        op += "ip_distr:_cip_|";
-    }
+	if(cli_ip != 0)
+	{
+		oss << "\t_cip_=" << cli_ip;
+		op += "ip_distr:_cip_|";
+	}
 
-    if(op.size() > 6)
-    {
-        op.erase(op.size() - 1, 1);
-        oss << op << '\n';
-    }
-    else
-    {
-        oss << '\n';
-    }
+	if(op.size() > 6)
+	{
+		op.erase(op.size() - 1, 1);
+		oss << op << '\n';
+	}
+	else
+	{
+		oss << '\n';
+	}
 
-    write_basic_log(oss.str(), ts);
+	write_basic_log(oss.str(), ts);
 }
 
 void StatLogger::reg_role(string acct_id, string player_id, string race, uint32_t cli_ip, string ads_id,
-						  string browser, string device, string os, string resolution, string network, string isp)
+		string browser, string device, string os, string resolution, string network, string isp)
 {
 	MY_ASSERT(verify_checksum());
-    if(acct_id.size() == 0)
-    {
-        acct_id = "-1";
-    }
+	if(acct_id.size() == 0)
+	{
+		acct_id = "-1";
+	}
 
 	time_t ts = time(0);
 	string op("\t_op_=");
@@ -564,24 +600,24 @@ void StatLogger::reg_role(string acct_id, string player_id, string race, uint32_
 	set_device_info(oss2, op, ads_id, browser, device, os, resolution, network, isp);
 
 
-    if(cli_ip != 0)
-    {
-	oss << "\t_cip_=" << cli_ip;
-	oss2 << "\t_cip_=" << cli_ip;
-	op += "ip_distr:_cip_|";
-    }
+	if(cli_ip != 0)
+	{
+		oss << "\t_cip_=" << cli_ip;
+		oss2 << "\t_cip_=" << cli_ip;
+		op += "ip_distr:_cip_|";
+	}
 
-    if(op.size() > 6)
-    {
-	    op.erase(op.size() - 1, 1);
-	    oss << op << '\n';
-	    oss2 << op << '\n';
-    }
-    else
-    {
-	    oss << '\n';
-	    oss2 << '\n';
-    }
+	if(op.size() > 6)
+	{
+		op.erase(op.size() - 1, 1);
+		oss << op << '\n';
+		oss2 << op << '\n';
+	}
+	else
+	{
+		oss << '\n';
+		oss2 << '\n';
+	}
 	// 角色新增
 	if (player_id.size()) {
 		MY_ASSERT(is_valid_playerid(player_id));
@@ -600,20 +636,25 @@ void StatLogger::reg_role(string acct_id, string player_id, string race, uint32_
 		oss2 << "\t_race_=" << race << '\n';
 	}
 
-	write_basic_log(oss.str(), ts);
-    if(m_serverID != 0){
-	write_basic_log2(oss2.str(), ts);
-    }
+
+
+	if(m_writeToTongji){
+		write_basic_log(oss.str(), ts);
+	}
+	if(m_writeToTms){
+		write_basic_log2(oss2.str(), ts);
+	}
+	
 }
 
 void StatLogger::verify_passwd(string acct_id, uint32_t cli_ip,
-						string ads_id, string browser, string device, string os, string resolution, string network, string isp)
+		string ads_id, string browser, string device, string os, string resolution, string network, string isp)
 {
 	MY_ASSERT(verify_checksum());
-    if(acct_id.size() == 0)
-    {
-        acct_id = "-1";
-    }
+	if(acct_id.size() == 0)
+	{
+		acct_id = "-1";
+	}
 
 	time_t ts = time(0);
 	//string op("\t_op_=ip_distr:_cip_|max_distr:_lv_|item:_vip_;"); // 暂时不用max_distr
@@ -626,49 +667,54 @@ void StatLogger::verify_passwd(string acct_id, uint32_t cli_ip,
 	set_device_info(oss, op, ads_id, browser, device, os, resolution, network, isp);
 	set_device_info(oss2, op, ads_id, browser, device, os, resolution, network, isp);
 
-    if(cli_ip != 0)
-    {
-	    oss << "\t_cip_=" << cli_ip;
-	    oss2 << "\t_cip_=" << cli_ip;
-        op += "ip_distr:_cip_|";
-    }
+	if(cli_ip != 0)
+	{
+		oss << "\t_cip_=" << cli_ip;
+		oss2 << "\t_cip_=" << cli_ip;
+		op += "ip_distr:_cip_|";
+	}
 
-    if(op.size() > 6)
-    {
+	if(op.size() > 6)
+	{
 		op.erase(op.size() - 1, 1);
 		oss << op << '\n';
 		oss2 << op << '\n';
-   	}
-   	else
-   	{
-	    oss << '\n';
-	    oss2 << '\n';
-   	}
+	}
+	else
+	{
+		oss << '\n';
+		oss2 << '\n';
+	}
 
-	write_basic_log(oss.str(), ts);
-    if(m_serverID != 0){
-	write_basic_log2(oss2.str(), ts);
-    }
+
+
+	if(m_writeToTongji){
+		write_basic_log(oss.str(), ts);
+	}
+	if(m_writeToTms){
+		write_basic_log2(oss2.str(), ts);
+	}
+	
 }
 
 
 void StatLogger::login_online(string acct_id, string player_id, string race, bool isvip, int lv, uint32_t cli_ip,
-						string ads_id, string zone, string browser, string device, string os, string resolution, string network, string isp)
+		string ads_id, string zone, string browser, string device, string os, string resolution, string network, string isp)
 {
 	MY_ASSERT(is_valid_lv(lv)  && verify_checksum());
-    if(acct_id.size() == 0)
-    {
-        acct_id = "-1";
-    }
+	if(acct_id.size() == 0)
+	{
+		acct_id = "-1";
+	}
 
 
 	time_t ts = time(0);
 	//string op("\t_op_=ip_distr:_cip_|max_distr:_lv_|item:_vip_;"); // 暂时不用max_distr
 	string op("\t_op_=item:_vip_|");
-   if(lv != 0)
-   {
-       op += "item:_lv_|";
-   }
+	if(lv != 0)
+	{
+		op += "item:_lv_|";
+	}
 	ostringstream oss;
 	ostringstream oss2;
 	// 帐号登录
@@ -679,32 +725,32 @@ void StatLogger::login_online(string acct_id, string player_id, string race, boo
 	set_device_info(oss, op, ads_id, browser, device, os, resolution, network, isp);
 	set_device_info(oss2, op, ads_id, browser, device, os, resolution, network, isp);
 
-    if(cli_ip != 0)
-    {
-        oss << "\t_cip_=" << cli_ip;
-        oss2 << "\t_cip_=" << cli_ip;
-    	op += "ip_distr:_cip_|";
-    }
+	if(cli_ip != 0)
+	{
+		oss << "\t_cip_=" << cli_ip;
+		oss2 << "\t_cip_=" << cli_ip;
+		op += "ip_distr:_cip_|";
+	}
 
 	if(zone.size())
-    {//统计各区的登录人数
-	    stat_trim_underscore(zone);
+	{//统计各区的登录人数
+		stat_trim_underscore(zone);
 		oss << "\t_zone_="<<zone;
 		oss2 << "\t_zone_="<<zone;
 		op += "item:_zone_|";
-    }
+	}
 
-    if(op.size() > 6)
-    {
+	if(op.size() > 6)
+	{
 		op.erase(op.size() - 1, 1);
 		oss << op << '\n';
 		oss2 << op << '\n';
-    }
-    else
-    {
+	}
+	else
+	{
 		oss << '\n';
 		oss2 << '\n';
-    }
+	}
 
 
 	// 角色登录
@@ -728,19 +774,24 @@ void StatLogger::login_online(string acct_id, string player_id, string race, boo
 
 	}
 
-	write_basic_log(oss.str(), ts);
-    if(m_serverID != 0){
-	write_basic_log2(oss2.str(), ts);
-    }
+
+
+	if(m_writeToTongji){
+		write_basic_log(oss.str(), ts);
+	}
+	if(m_writeToTms){
+		write_basic_log2(oss2.str(), ts);
+	}
+	
 }
 
 void StatLogger::start_device(string device_id)
 {
 
-    if(device_id.size() == 0)
-    {
-        device_id = "-1";
-    }
+	if(device_id.size() == 0)
+	{
+		device_id = "-1";
+	}
 	time_t ts = time(0);
 	ostringstream oss;
 	ostringstream oss2;
@@ -757,10 +808,10 @@ void StatLogger::logout(string acct_id, bool isvip, int lv, int oltime)
 {
 	MY_ASSERT(is_valid_lv(lv) && is_valid_oltm(oltime) && verify_checksum());
 
-    if(acct_id.size() == 0)
-    {
-        acct_id = "-1";
-    }
+	if(acct_id.size() == 0)
+	{
+		acct_id = "-1";
+	}
 
 	time_t ts = time(0);
 	ostringstream oss;
@@ -773,19 +824,24 @@ void StatLogger::logout(string acct_id, bool isvip, int lv, int oltime)
 	oss2 << "\t_vip_=" << isvip << "\t_lv_=" << lv << "\t_oltm_=" << oltime
 		<< "\t_intv_=" << logout_time_interval(oltime) << "\t_op_=sum:_oltm_|item:_intv_\n";
 
-	write_basic_log(oss.str(), ts);
-    if(m_serverID != 0){
-	write_basic_log2(oss2.str(), ts);
-    }
+
+
+	if(m_writeToTongji){
+		write_basic_log(oss.str(), ts);
+	}
+	if(m_writeToTms){
+		write_basic_log2(oss2.str(), ts);
+	}
+	
 }
 
 void StatLogger::accumulate_online_time(string acct_id, string race, int oltime)
 {
 	MY_ASSERT(is_valid_oltm(oltime) && verify_checksum());
-    if(acct_id.size() == 0)
-    {
-        acct_id = "-1";
-    }
+	if(acct_id.size() == 0)
+	{
+		acct_id = "-1";
+	}
 
 	time_t ts = time(0);
 	ostringstream oss;
@@ -806,10 +862,10 @@ void StatLogger::accumulate_online_time(string acct_id, string race, int oltime)
 void StatLogger::level_up(string acct_id, string race, int lv)
 {
 	MY_ASSERT(is_valid_lv(lv) && verify_checksum());
-    if(acct_id.size() == 0)
-    {
-        acct_id = "-1";
-    }
+	if(acct_id.size() == 0)
+	{
+		acct_id = "-1";
+	}
 
 	time_t ts = time(0);
 	ostringstream oss;
@@ -829,140 +885,157 @@ void StatLogger::level_up(string acct_id, string race, int lv)
 		oss2 << "\t_lv_=" << lv << "\t_race_=" << race << "\t_op_=set_distr:_lv_" << '\n';
 	}
 
-	write_basic_log(oss.str(), ts);
-    if(m_serverID != 0){
-	write_basic_log2(oss2.str(), ts);
-    }
+
+
+	if(m_writeToTongji){
+		write_basic_log(oss.str(), ts);
+	}
+	if(m_writeToTms){
+		write_basic_log2(oss2.str(), ts);
+	}
+	
 }
 
 void StatLogger::obtain_spirit(std::string acct_id, bool isvip, int lv, std::string spirit)
 {
-    MY_ASSERT(is_valid_lv(lv) && verify_checksum());
-    if(acct_id.size() == 0)
-    {
-        acct_id = "-1";
-    }
+	MY_ASSERT(is_valid_lv(lv) && verify_checksum());
+	if(acct_id.size() == 0)
+	{
+		acct_id = "-1";
+	}
 
-    time_t ts = time(0);
-    ostringstream oss;
-    ostringstream oss2;
+	time_t ts = time(0);
+	ostringstream oss;
+	ostringstream oss2;
 
-    stat_trim_underscore(spirit);
-    set_basic_info(oss, "_obtainspirit_", "_obtainspirit_", ts, acct_id);
-    set_basic_info2(oss2, 20, ts, acct_id);
-    oss << "\t_lv_=" << lv << "\t_vip_=" << isvip << "\t_spirit_=" << spirit << '\n';
-    oss2 << "\t_lv_=" << lv << "\t_vip_=" << isvip << "\t_spirit_=" << spirit << '\n';
+	stat_trim_underscore(spirit);
+	set_basic_info(oss, "_obtainspirit_", "_obtainspirit_", ts, acct_id);
+	set_basic_info2(oss2, 20, ts, acct_id);
+	oss << "\t_lv_=" << lv << "\t_vip_=" << isvip << "\t_spirit_=" << spirit << '\n';
+	oss2 << "\t_lv_=" << lv << "\t_vip_=" << isvip << "\t_spirit_=" << spirit << '\n';
 
-    write_basic_log(oss.str(), ts);
-    if(m_serverID != 0){
-    write_basic_log2(oss2.str(), ts);
-    }
+
+
+	if(m_writeToTongji){
+		write_basic_log(oss.str(), ts);
+	}
+	if(m_writeToTms){
+		write_basic_log2(oss2.str(), ts);
+	}
+	
+
 }
 
 void StatLogger::lose_spirit(std::string acct_id, bool isvip, int lv, std::string spirit)
 {
-    MY_ASSERT(is_valid_lv(lv) && verify_checksum());
-    if(acct_id.size() == 0)
-    {
-        acct_id = "-1";
-    }
+	MY_ASSERT(is_valid_lv(lv) && verify_checksum());
+	if(acct_id.size() == 0)
+	{
+		acct_id = "-1";
+	}
 
-    time_t ts = time(0);
-    ostringstream oss;
-    ostringstream oss2;
+	time_t ts = time(0);
+	ostringstream oss;
+	ostringstream oss2;
 
-    stat_trim_underscore(spirit);
-    set_basic_info(oss, "_losespirit_", "_losespirit_", ts, acct_id);
-    set_basic_info2(oss2, 21, ts, acct_id);
-    oss << "\t_lv_=" << lv << "\t_vip_=" << isvip << "\t_spirit_=" << spirit << '\n';
-    oss2 << "\t_lv_=" << lv << "\t_vip_=" << isvip << "\t_spirit_=" << spirit << '\n';
+	stat_trim_underscore(spirit);
+	set_basic_info(oss, "_losespirit_", "_losespirit_", ts, acct_id);
+	set_basic_info2(oss2, 21, ts, acct_id);
+	oss << "\t_lv_=" << lv << "\t_vip_=" << isvip << "\t_spirit_=" << spirit << '\n';
+	oss2 << "\t_lv_=" << lv << "\t_vip_=" << isvip << "\t_spirit_=" << spirit << '\n';
 
-    write_basic_log(oss.str(), ts);
-    if(m_serverID != 0){
-    write_basic_log2(oss2.str(), ts);
-    }
+
+
+	if(m_writeToTongji){
+		write_basic_log(oss.str(), ts);
+	}
+	if(m_writeToTms){
+		write_basic_log2(oss2.str(), ts);
+	}
+	
+
 }
 
 void StatLogger::pay_item(string acct_id, bool isvip, float pay_amount,
-                        CurrencyType currency, string outcome, int outcnt)
+		CurrencyType currency, string outcome, int outcnt)
 {
 	MY_ASSERT( (pay_amount > 0) && is_valid_currency(currency) && (outcnt > 0) 
 			&& is_valid_common_utf8_parm(outcome, 0) 
 			&& verify_checksum());
 	time_t ts = time(0);
-    //这里可以统计出付费总额(通常单个游戏，不应该出现多种货币单位)、VIP和非VIP用户付费总额、各种货币单位付费总额
+	//这里可以统计出付费总额(通常单个游戏，不应该出现多种货币单位)、VIP和非VIP用户付费总额、各种货币单位付费总额
 	string op = "\t_op_=sum:_amt_";
 	ostringstream oss;
 	// 帐号付费 //不包含赠送渠道
-    set_basic_info(oss, "_mibiitem_", "_mibiitem_", ts, acct_id);
-    oss << "\t_vip_=" << isvip << "\t_amt_=" << pay_amount << "\t_ccy_=" << currency << op << '\n';
+	set_basic_info(oss, "_mibiitem_", "_mibiitem_", ts, acct_id);
+	oss << "\t_vip_=" << isvip << "\t_amt_=" << pay_amount << "\t_ccy_=" << currency << op << '\n';
 	write_basic_log(oss.str(), ts);
 }
 
 void StatLogger::pay(string acct_id, bool isvip, float pay_amount,
-						CurrencyType currency, PayReason pay_reason, string outcome, int outcnt,
-						string pay_channel)
+		CurrencyType currency, PayReason pay_reason, string outcome, int outcnt,
+		string pay_channel)
 {
 	MY_ASSERT( (pay_amount > 0) && is_valid_currency(currency) && is_valid_payreason(pay_reason)
 			&& (outcnt > 0) && (outcome.size() || (pay_reason != pay_buy))
 			&& is_valid_common_utf8_parm(outcome, 0) && is_valid_common_utf8_parm(pay_channel, 1)
 			&& verify_checksum());
 
-    if(acct_id.size() == 0)
-    {
-        acct_id = "-1";
-    }
+	if(acct_id.size() == 0)
+	{
+		acct_id = "-1";
+	}
 
 	string reason;
 	switch (pay_reason) {
-	case pay_charge:
-		reason   = "_buycoins_";
-		break;
-	case pay_vip:
-		reason   = "_vipmonth_";
-		break;
-	case pay_buy:
-		reason   = "_buyitem_";
-		break;
-   	case pay_free:
-        	reason   = "_costfree_";
-		break;
-	default:
-		break;
+		case pay_charge:
+			reason   = "_buycoins_";
+			break;
+		case pay_vip:
+			reason   = "_vipmonth_";
+			break;
+		case pay_buy:
+			reason   = "_buyitem_";
+			break;
+		case pay_free:
+			reason   = "_costfree_";
+			break;
+		default:
+			break;
 	}
 
 	time_t ts = time(0);
-    //这里可以统计出付费总额(通常单个游戏，不应该出现多种货币单位)、VIP和非VIP用户付费总额、各种货币单位付费总额
+	//这里可以统计出付费总额(通常单个游戏，不应该出现多种货币单位)、VIP和非VIP用户付费总额、各种货币单位付费总额
 	string op = "\t_op_=sum:_amt_|item_sum:_vip_,_amt_|item_sum:_paychannel_,_amt_|item_sum:_ccy_,_amt_|item:_paychannel_";
 	ostringstream oss;
 	ostringstream oss2;
 	// 帐号付费 //不包含赠送渠道
-    if(pay_reason != pay_free)
-    {
-        set_basic_info(oss, "_acpay_", "_acpay_", ts, acct_id);
-        set_basic_info2(oss2, 12, ts, acct_id);
-	    oss << "\t_vip_=" << isvip << "\t_amt_=" << pay_amount << "\t_ccy_=" << currency << "\t_paychannel_=" << pay_channel
-		    << op << '\n';
-	    oss2 << "\t_vip_=" << isvip << "\t_amt_=" << pay_amount << "\t_ccy_=" << currency << "\t_paychannel_=" << pay_channel
-		    << op << '\n';
-    }
+	if(pay_reason != pay_free)
+	{
+		set_basic_info(oss, "_acpay_", "_acpay_", ts, acct_id);
+		set_basic_info2(oss2, 12, ts, acct_id);
+		oss << "\t_vip_=" << isvip << "\t_amt_=" << pay_amount << "\t_ccy_=" << currency << "\t_paychannel_=" << pay_channel
+			<< op << '\n';
+		oss2 << "\t_vip_=" << isvip << "\t_amt_=" << pay_amount << "\t_ccy_=" << currency << "\t_paychannel_=" << pay_channel
+			<< op << '\n';
+	}
 
 	set_basic_info(oss, "_acpay_", reason , ts, acct_id);
 	switch (pay_reason) {
-	case pay_vip:
-		set_basic_info2(oss2, 13 , ts, acct_id);
-		break;
-	case pay_buy:
-		set_basic_info2(oss2, 14 , ts, acct_id);
-		break;
-	case pay_charge:
-		set_basic_info2(oss2, 38 , ts, acct_id);
-		break;
-	case pay_free:
-		set_basic_info2(oss2, 39 , ts, acct_id);
-		break;
-	default:
-		break;
+		case pay_vip:
+			set_basic_info2(oss2, 13 , ts, acct_id);
+			break;
+		case pay_buy:
+			set_basic_info2(oss2, 14 , ts, acct_id);
+			break;
+		case pay_charge:
+			set_basic_info2(oss2, 38 , ts, acct_id);
+			break;
+		case pay_free:
+			set_basic_info2(oss2, 39 , ts, acct_id);
+			break;
+		default:
+			break;
 	}
 	oss << "\t_vip_=" << isvip << "\t_amt_=" << pay_amount << "\t_ccy_=" << currency << "\t_paychannel_=" << pay_channel
 		<< op << '\n';
@@ -970,72 +1043,82 @@ void StatLogger::pay(string acct_id, bool isvip, float pay_amount,
 		<< op << '\n';
 
 
-	write_basic_log(oss.str(), ts);
-    if(m_serverID != 0){
-	write_basic_log2(oss2.str(), ts);
-    }
+	if(m_writeToTongji){
+		write_basic_log(oss.str(), ts);
+	}
+	if(m_writeToTms){
+		write_basic_log2(oss2.str(), ts);
+	}
 
 	switch (pay_reason)
-    {
-	case pay_charge:
-        //需要统计金币产出
-		do_obtain_golds(acct_id,  "_userbuy_", outcnt);
-		break;
-    	case pay_vip:
-        //需要统计各个包月时长
-       		do_buy_vip(acct_id, pay_amount, outcnt);
-        	break;
-	case pay_buy:
-        //需要统计道具产出
-		do_buy_item(acct_id, isvip, 0,  pay_amount, "_mibiitem_", outcome, outcnt);
-		break;
-	default:
-		break;
+	{
+		case pay_charge:
+			//需要统计金币产出
+			do_obtain_golds(acct_id,  "_userbuy_", outcnt);
+			break;
+		case pay_vip:
+			//需要统计各个包月时长
+			do_buy_vip(acct_id, pay_amount, outcnt);
+			break;
+		case pay_buy:
+			//需要统计道具产出
+			do_buy_item(acct_id, isvip, 0,  pay_amount, "_mibiitem_", outcome, outcnt);
+			break;
+		default:
+			break;
 	}
 }
 
 void StatLogger::unsubscribe(string acct_id, UnsubscribeChannel uc)
 {
-    MY_ASSERT(verify_checksum());
-    if(acct_id.size() == 0)
-    {
-        return;
-    }
+	MY_ASSERT(verify_checksum());
+	if(acct_id.size() == 0)
+	{
+		return;
+	}
 
-    time_t ts = time(0);
+	time_t ts = time(0);
 	ostringstream oss;
 	ostringstream oss2;
-    string op = "\t_op_=item:_uc_";
-    set_basic_info(oss, "_unsub_", "_unsub_", ts, acct_id);
-    set_basic_info2(oss2, 22, ts, acct_id);
-    oss << "\t_uc_=" << uc << op << "\n";
-    oss2 << "\t_uc_=" << uc << op << "\n";
-    write_basic_log(oss.str(), ts);
-    if(m_serverID != 0){
-    write_basic_log2(oss2.str(), ts);
-    }
+	string op = "\t_op_=item:_uc_";
+	set_basic_info(oss, "_unsub_", "_unsub_", ts, acct_id);
+	set_basic_info2(oss2, 22, ts, acct_id);
+	oss << "\t_uc_=" << uc << op << "\n";
+	oss2 << "\t_uc_=" << uc << op << "\n";
+
+	if(m_writeToTongji){
+		write_basic_log(oss.str(), ts);
+	}
+	if(m_writeToTms){
+		write_basic_log2(oss2.str(), ts);
+	}
+	
 }
 
 void StatLogger::cancel_acct(string acct_id, string channel)
 {
-    MY_ASSERT(verify_checksum());
-    if(acct_id.size() == 0)
-    {
-        return;
-    }
+	MY_ASSERT(verify_checksum());
+	if(acct_id.size() == 0)
+	{
+		return;
+	}
 
-    time_t ts = time(0);
+	time_t ts = time(0);
 	ostringstream oss;
 	ostringstream oss2;
-    string op = "\t_op_=item:_cac_";
-    set_basic_info(oss, "_ccacct_", "_ccacct_", ts, acct_id);
-    set_basic_info2(oss2, 23, ts, acct_id);
-    oss << "\t_cac_=" << channel << op << "\n";
-    oss2 << "\t_cac_=" << channel << op << "\n";
-    write_basic_log(oss.str(), ts);
-    if(m_serverID != 0){
-    write_basic_log2(oss2.str(), ts);
-    }
+	string op = "\t_op_=item:_cac_";
+	set_basic_info(oss, "_ccacct_", "_ccacct_", ts, acct_id);
+	set_basic_info2(oss2, 23, ts, acct_id);
+	oss << "\t_cac_=" << channel << op << "\n";
+	oss2 << "\t_cac_=" << channel << op << "\n";
+
+	if(m_writeToTongji){
+		write_basic_log(oss.str(), ts);
+	}
+	if(m_writeToTms){
+		write_basic_log2(oss2.str(), ts);
+	}
+	
 
 }
 
@@ -1044,10 +1127,10 @@ void StatLogger::obtain_golds(string acct_id, int amt)
 
 	MY_ASSERT( (amt > 0) && (amt <= 1000000000) && verify_checksum());
 
-    if(acct_id.size() == 0)
-    {
-        acct_id = "-1";
-    }
+	if(acct_id.size() == 0)
+	{
+		acct_id = "-1";
+	}
 	do_obtain_golds(acct_id, "_systemsend_", m_need_multi?amt*100:amt);
 }
 
@@ -1055,10 +1138,10 @@ void StatLogger::obtain_golds(string acct_id, int amt)
 void StatLogger::use_golds_buyitem(std::string acct_id, bool is_vip, float amt, int lv)
 {
 
-    if(acct_id.size() == 0)
-    {
-        acct_id = "-1";
-    }
+	if(acct_id.size() == 0)
+	{
+		acct_id = "-1";
+	}
 
 
 	time_t ts = time(0);
@@ -1075,10 +1158,14 @@ void StatLogger::use_golds_buyitem(std::string acct_id, bool is_vip, float amt, 
 	oss << "\t_golds_=" << amt << "\t_isvip_=" << is_vip << "\t_lv_=" << lv << "\t_op_=item:_isvip_|item_sum:_lv_,_golds_|sum:_golds_\n";
 	oss2 << "\t_golds_=" << amt << "\t_isvip_=" << is_vip << "\t_lv_=" << lv << "\t_op_=item:_isvip_|item_sum:_lv_,_golds_|sum:_golds_\n";
 
-	write_basic_log(oss.str(), ts);
-    if(m_serverID != 0){
-	write_basic_log2(oss2.str(), ts);
-    }
+
+	if(m_writeToTongji){
+		write_basic_log(oss.str(), ts);
+	}
+	if(m_writeToTms){
+		write_basic_log2(oss2.str(), ts);
+	}
+	
 
 }
 
@@ -1093,15 +1180,15 @@ void StatLogger::use_golds(std::string acct_id, bool is_vip, std::string reason,
 			&& is_valid_lv(lv) && verify_checksum());
 
 
-    if(acct_id.size() == 0)
-    {
-        acct_id = "-1";
-    }
+	if(acct_id.size() == 0)
+	{
+		acct_id = "-1";
+	}
 
-    if(reason.size() == 0)
-    {
-        reason = "unknown";
-    }
+	if(reason.size() == 0)
+	{
+		reason = "unknown";
+	}
 
 	time_t ts = time(0);
 	ostringstream oss;
@@ -1117,32 +1204,36 @@ void StatLogger::use_golds(std::string acct_id, bool is_vip, std::string reason,
 	oss << "\t_golds_=" << (m_need_multi?amt*100:amt) << "\t_isvip_=" << is_vip << "\t_lv_=" << lv << "\t_op_=item:_isvip_|item_sum:_lv_,_golds_|sum:_golds_\n";
 	oss2 << "\t_golds_=" << (m_need_multi?amt*100:amt) << "\t_isvip_=" << is_vip << "\t_lv_=" << lv << "\t_reason_=" << reason << "\t_op_=item:_isvip_|item_sum:_lv_,_golds_|sum:_golds_\n";
 
-	write_basic_log(oss.str(), ts);
-    if(m_serverID != 0){
-	write_basic_log2(oss2.str(), ts);
-    }
+
+	if(m_writeToTongji){
+		write_basic_log(oss.str(), ts);
+	}
+	if(m_writeToTms){
+		write_basic_log2(oss2.str(), ts);
+	}
+	
 }
 
 //游戏内一级货币购买道具
 void StatLogger::buy_item(string acct_id,  bool isvip, int lv,  float pay_amount, string outcome, int outcnt)
 {
-    //printf("check param\n");
+	//printf("check param\n");
 	MY_ASSERT(is_valid_lv(lv) && (pay_amount > 0)
 			&& is_valid_common_utf8_parm(outcome) && (outcnt > 0)
 			&& verify_checksum());
-    //printf("check param ok\n");
+	//printf("check param ok\n");
 
-    if(acct_id.size() == 0)
-    {
-        acct_id = "-1";
-    }
-    if(outcome.size() == 0)
-    {
-        outcome = "-1";
-    }
+	if(acct_id.size() == 0)
+	{
+		acct_id = "-1";
+	}
+	if(outcome.size() == 0)
+	{
+		outcome = "-1";
+	}
 
 	do_buy_item(acct_id, isvip, lv,  m_need_multi?pay_amount*100:pay_amount, "_coinsbuyitem_", outcome, outcnt);
-    use_golds_buyitem(acct_id, isvip, m_need_multi?pay_amount*100:pay_amount,lv);
+	use_golds_buyitem(acct_id, isvip, m_need_multi?pay_amount*100:pay_amount,lv);
 }
 
 void StatLogger::accept_task(TaskType type, std::string acct_id, std::string task_name, int lv)
@@ -1152,15 +1243,15 @@ void StatLogger::accept_task(TaskType type, std::string acct_id, std::string tas
 	MY_ASSERT(is_valid_tasktype(type)
 			&& is_valid_common_utf8_parm(task_name) && verify_checksum());
 
-    if(acct_id.size() == 0)
-    {
-        acct_id = "-1";
-    }
+	if(acct_id.size() == 0)
+	{
+		acct_id = "-1";
+	}
 
-    if(task_name.size() == 0)
-    {
-        task_name = "unknown";
-    }
+	if(task_name.size() == 0)
+	{
+		task_name = "unknown";
+	}
 
 	time_t ts = time(0);
 	ostringstream oss;
@@ -1168,20 +1259,24 @@ void StatLogger::accept_task(TaskType type, std::string acct_id, std::string tas
 	// 帐号接取任务
 	set_basic_info(oss, get_task_stid(type, 0), task_name, ts, acct_id);
 	set_basic_info2(oss2, get_task_logid(type, 0), ts, acct_id);
-    if(lv != 0)
-    {
-        oss << "\t_lv_=" << lv << "\t_op_=item:_lv_\n";
-        oss2 << "\t_lv_=" << lv << "\t_taskname_=" << task_name << "\t_op_=item:_lv_\n";
-    }
-    else
-    {
-        oss << "\n";
-        oss2 << "\t_taskname_=" << task_name << "\n";
-    }
-	write_basic_log(oss.str(), ts);
-    if(m_serverID != 0){
-	write_basic_log2(oss2.str(), ts);
-    }
+	if(lv != 0)
+	{
+		oss << "\t_lv_=" << lv << "\t_op_=item:_lv_\n";
+		oss2 << "\t_lv_=" << lv << "\t_taskname_=" << task_name << "\t_op_=item:_lv_\n";
+	}
+	else
+	{
+		oss << "\n";
+		oss2 << "\t_taskname_=" << task_name << "\n";
+	}
+
+	if(m_writeToTongji){
+		write_basic_log(oss.str(), ts);
+	}
+	if(m_writeToTms){
+		write_basic_log2(oss2.str(), ts);
+	}
+	
 }
 
 void StatLogger::finish_task(TaskType type, std::string acct_id, std::string task_name, int lv)
@@ -1192,15 +1287,15 @@ void StatLogger::finish_task(TaskType type, std::string acct_id, std::string tas
 	MY_ASSERT(is_valid_tasktype(type) && is_valid_common_utf8_parm(task_name)
 			&& verify_checksum());
 
-    if(acct_id.size() == 0)
-    {
-        acct_id = "-1";
-    }
+	if(acct_id.size() == 0)
+	{
+		acct_id = "-1";
+	}
 
-    if(task_name.size() == 0)
-    {
-        task_name = "unknown";
-    }
+	if(task_name.size() == 0)
+	{
+		task_name = "unknown";
+	}
 
 	time_t ts = time(0);
 	ostringstream oss;
@@ -1208,20 +1303,24 @@ void StatLogger::finish_task(TaskType type, std::string acct_id, std::string tas
 	// 帐号完成任务
 	set_basic_info(oss, get_task_stid(type, 1), task_name, ts, acct_id);
 	set_basic_info2(oss2, get_task_logid(type, 1), ts, acct_id);
-    if(lv != 0)
-    {
-        oss << "\t_lv_=" << lv << "\t_op_=item:_lv_\n";
-        oss2 << "\t_lv_=" << lv << "\t_taskname_=" << task_name << "\t_op_=item:_lv_\n";
-    }
-    else
-    {
-        oss << "\n";
-        oss2 << "\t_taskname_=" << task_name << "\n";
-    }
-	write_basic_log(oss.str(), ts);
-    if(m_serverID != 0){
-	write_basic_log2(oss2.str(), ts);
-    }
+	if(lv != 0)
+	{
+		oss << "\t_lv_=" << lv << "\t_op_=item:_lv_\n";
+		oss2 << "\t_lv_=" << lv << "\t_taskname_=" << task_name << "\t_op_=item:_lv_\n";
+	}
+	else
+	{
+		oss << "\n";
+		oss2 << "\t_taskname_=" << task_name << "\n";
+	}
+
+	if(m_writeToTongji){
+		write_basic_log(oss.str(), ts);
+	}
+	if(m_writeToTms){
+		write_basic_log2(oss2.str(), ts);
+	}
+	
 }
 
 void StatLogger::abort_task(TaskType type, std::string acct_id, std::string task_name, int lv)
@@ -1231,15 +1330,15 @@ void StatLogger::abort_task(TaskType type, std::string acct_id, std::string task
 	MY_ASSERT(is_valid_tasktype(type)
 			&& is_valid_common_utf8_parm(task_name) && verify_checksum());
 
-    if(acct_id.size() == 0)
-    {
-        acct_id = "-1";
-    }
+	if(acct_id.size() == 0)
+	{
+		acct_id = "-1";
+	}
 
-    if(task_name.size() == 0)
-    {
-        task_name = "unknown";
-    }
+	if(task_name.size() == 0)
+	{
+		task_name = "unknown";
+	}
 
 	time_t ts = time(0);
 	ostringstream oss;
@@ -1247,41 +1346,74 @@ void StatLogger::abort_task(TaskType type, std::string acct_id, std::string task
 	// 帐号放弃任务
 	set_basic_info(oss, get_task_stid(type, 2), task_name, ts, acct_id);
 	set_basic_info2(oss2, get_task_logid(type, 2), ts, acct_id);
-    if(lv != 0)
-    {
-        oss << "\t_lv_=" << lv << "\t_op_=item:_lv_\n";
-        oss2 << "\t_lv_=" << lv << "\t_taskname_=" << task_name << "\t_op_=item:_lv_\n";
-    }
-    else
-    {
-        oss << "\n";
-        oss2 << "\t_taskname_=" << task_name << "\n";
-    }
-	write_basic_log(oss.str(), ts);
-    if(m_serverID != 0){
-	write_basic_log2(oss2.str(), ts);
-    }
+	if(lv != 0)
+	{
+		oss << "\t_lv_=" << lv << "\t_op_=item:_lv_\n";
+		oss2 << "\t_lv_=" << lv << "\t_taskname_=" << task_name << "\t_op_=item:_lv_\n";
+	}
+	else
+	{
+		oss << "\n";
+		oss2 << "\t_taskname_=" << task_name << "\n";
+	}
+
+	if(m_writeToTongji){
+		write_basic_log(oss.str(), ts);
+	}
+	if(m_writeToTms){
+		write_basic_log2(oss2.str(), ts);
+	}
+	
 }
 
-void StatLogger::new_trans(NewTransStep step, std::string acct_id)
+//void StatLogger::new_trans(NewTransStep step, std::string acct_id)
+//{
+//	MY_ASSERT(is_valid_newtransstep(step));
+//	if(acct_id.size() == 0)
+//	{
+//		acct_id = "-1";
+//	}
+//	time_t ts = time(0);
+//	ostringstream oss;
+//	ostringstream oss2;
+//	// 注册转化率
+//	set_basic_info(oss, "_newtrans_", get_new_trans_step(step), ts, acct_id);
+//	set_basic_info2(oss2, get_new_trans_logid(step), ts, acct_id);
+//	oss << "\n";
+//	oss2 << "\n";
+//
+//	if(m_writeToTongji){
+//		write_basic_log(oss.str(), ts);
+//	}
+//	if(m_writeToTms){
+//		write_basic_log2(oss2.str(), ts);
+//	}
+//	
+//}
+
+void StatLogger::new_trans(int modelid,int stepid, std::string acct_id)
 {
-	MY_ASSERT(is_valid_newtransstep(step));
-    if(acct_id.size() == 0)
-    {
-        acct_id = "-1";
-    }
+	MY_ASSERT(modelid > 0 && stepid > 0);
+	if(acct_id.size() == 0)
+	{
+		acct_id = "-1";
+	}
 	time_t ts = time(0);
 	ostringstream oss;
 	ostringstream oss2;
 	// 注册转化率
-	set_basic_info(oss, "_newtrans_", get_new_trans_step(step), ts, acct_id);
-	set_basic_info2(oss2, get_new_trans_logid(step), ts, acct_id);
-   	oss << "\n";
-   	oss2 << "\n";
-	write_basic_log(oss.str(), ts);
-    if(m_serverID != 0){
-	write_basic_log2(oss2.str(), ts);
-    }
+	set_basic_info(oss, "_newtrans_", get_new_trans_sstid(modelid,stepid), ts, acct_id);
+	set_basic_info2(oss2, 78, ts, acct_id);
+	oss << "\n";
+	oss2 << "\t_model_=" << modelid << "\t_step_=" << stepid << "\n";
+
+	if(m_writeToTongji){
+		write_basic_log(oss.str(), ts);
+	}
+	if(m_writeToTms){
+		write_basic_log2(oss2.str(), ts);
+	}
+	
 }
 
 void StatLogger::log(string stat_name, string sub_stat_name, string acct_id, string player_id, const StatInfo& info)
@@ -1291,19 +1423,19 @@ void StatLogger::log(string stat_name, string sub_stat_name, string acct_id, str
 
 	MY_ASSERT(is_valid_common_utf8_parm(stat_name) && is_valid_common_utf8_parm(sub_stat_name) && verify_checksum());
 
-    if(acct_id.size() == 0)
-    {
-        acct_id = "-1";
-    }
-    if(stat_name.size() == 0)
-    {
-        stat_name = "unknown";
-    }
+	if(acct_id.size() == 0)
+	{
+		acct_id = "-1";
+	}
+	if(stat_name.size() == 0)
+	{
+		stat_name = "unknown";
+	}
 
-    if(sub_stat_name.size() == 0)
-    {
-        sub_stat_name = "unknown";
-    }
+	if(sub_stat_name.size() == 0)
+	{
+		sub_stat_name = "unknown";
+	}
 	time_t ts = time(0);
 	ostringstream oss;
 	ostringstream oss2;
@@ -1312,10 +1444,14 @@ void StatLogger::log(string stat_name, string sub_stat_name, string acct_id, str
 	oss << info << '\n';
 	oss2 << info << '\n';
 
-	write_custom_log(oss.str(), ts);
-	if(m_serverID != 0){
-		write_custom_log2(oss2.str(), ts);
+
+	if(m_writeToTongji){
+		write_basic_log(oss.str(), ts);
 	}
+	if(m_writeToTms){
+		write_basic_log2(oss2.str(), ts);
+	}
+	
 }
 
 //-------------------------------------------
@@ -1337,16 +1473,24 @@ void StatLogger::do_obtain_golds(const string& acct_id, const string& reason, in
 	oss << "\t_golds_=" << amt << "\t_op_=sum:_golds_\n";
 	oss2 << "\t_golds_=" << amt << "\t_op_=sum:_golds_\n";
 
-	write_basic_log(oss.str(), ts);
+
+	if(m_writeToTongji){
+		write_basic_log(oss.str(), ts);
+	}
+	
 	if(reason == "_systemsend_"){
-            if(m_serverID != 0){
-		write_basic_log2(oss2.str(), ts);
-            }
+	
+		if(m_writeToTms){
+			write_basic_log2(oss2.str(), ts);
+		}
+	
 	}
 	else if(reason == "_userbuy_"){
-            if(m_serverID != 0){
-		write_basic_log2(oss2.str(), ts);
-            }
+	
+		if(m_writeToTms){
+			write_basic_log2(oss2.str(), ts);
+		}
+	
 	}
 }
 
@@ -1354,17 +1498,21 @@ void StatLogger::do_obtain_golds(const string& acct_id, const string& reason, in
 void StatLogger::do_buy_vip(const string & acct_id, float pay_amount, int amt)
 {
 
-    time_t ts = time(0);
-    ostringstream oss;
-    ostringstream oss2;
-    set_basic_info(oss, "_buyvip_", "_buyvip_", ts, acct_id);
-    set_basic_info2(oss2, 15, ts, acct_id);
-    oss<< "\t_payamt_="<< pay_amount << "\t_amt_=" << amt << "\t_op_=item:_amt_|item_sum:_amt_,_payamt_\n";
-    oss2<< "\t_payamt_="<< pay_amount << "\t_amt_=" << amt << "\t_op_=item:_amt_|item_sum:_amt_,_payamt_\n";
-    write_basic_log(oss.str(), ts);
-    if(m_serverID != 0){
-    write_basic_log2(oss2.str(), ts);
-    }
+	time_t ts = time(0);
+	ostringstream oss;
+	ostringstream oss2;
+	set_basic_info(oss, "_buyvip_", "_buyvip_", ts, acct_id);
+	set_basic_info2(oss2, 15, ts, acct_id);
+	oss<< "\t_payamt_="<< pay_amount << "\t_amt_=" << amt << "\t_op_=item:_amt_|item_sum:_amt_,_payamt_\n";
+	oss2<< "\t_payamt_="<< pay_amount << "\t_amt_=" << amt << "\t_op_=item:_amt_|item_sum:_amt_,_payamt_\n";
+
+	if(m_writeToTongji){
+		write_basic_log(oss.str(), ts);
+	}
+	if(m_writeToTms){
+		write_basic_log2(oss2.str(), ts);
+	}
+	
 
 }
 
@@ -1375,65 +1523,67 @@ void StatLogger::do_buy_item(const string& acct_id, bool isvip, int lv, float pa
 	ostringstream oss;
 	ostringstream oss2;
 
-    set_basic_info(oss, "_buyitem_", pay_type, ts, acct_id);
-    if(pay_type == "_mibiitem_"){
-	    set_basic_info2(oss2, 16, ts, acct_id);
-    }
-    if(pay_type == "_coinsbuyitem_"){
-	    set_basic_info2(oss2, 18, ts, acct_id);
-    }
-    string op("\t_op_=sum:_golds_");
-    if(lv != 0)
-    {
-	    op += "|item:_lv_";
-    }
+	set_basic_info(oss, "_buyitem_", pay_type, ts, acct_id);
+	if(pay_type == "_mibiitem_"){
+		set_basic_info2(oss2, 16, ts, acct_id);
+	}
+	if(pay_type == "_coinsbuyitem_"){
+		set_basic_info2(oss2, 18, ts, acct_id);
+	}
+	string op("\t_op_=sum:_golds_");
+	if(lv != 0)
+	{
+		op += "|item:_lv_";
+	}
 
-    oss << "\t_isvip_="<< isvip << "\t_item_="<< outcome << "\t_itmcnt_="<<outcnt << "\t_golds_="<<pay_amount<<  "\t_lv_=" << lv << op << "\n";
-    oss2 << "\t_isvip_="<< isvip << "\t_item_="<< outcome << "\t_itmcnt_="<<outcnt << "\t_golds_="<<pay_amount<<  "\t_lv_=" << lv << op << "\n";
+	oss << "\t_isvip_="<< isvip << "\t_item_="<< outcome << "\t_itmcnt_="<<outcnt << "\t_golds_="<<pay_amount<<  "\t_lv_=" << lv << op << "\n";
+	oss2 << "\t_isvip_="<< isvip << "\t_item_="<< outcome << "\t_itmcnt_="<<outcnt << "\t_golds_="<<pay_amount<<  "\t_lv_=" << lv << op << "\n";
 
 
-   // string stid;
-   // if(isvip == true)
-   // {
-   //     stid = "_VIP用户购买道具_";
-   // }
-   // else
-   // {
-   //     stid = "_非VIP用户购买道具_";
-   // }
+	// string stid;
+	// if(isvip == true)
+	// {
+	//     stid = "_VIP用户购买道具_";
+	// }
+	// else
+	// {
+	//     stid = "_非VIP用户购买道具_";
+	// }
 	// 帐号购买道具
-//	string op_v("\t_op_=sum:_golds_|item:_item_|item_sum:_item_,_itemcnt_|item_sum:_item_,_golds_");
-//	set_basic_info(oss, stid, pay_type, ts, acct_id);
-//	oss << "\t_golds_=" << pay_amount << "\t_item_=" << outcome << "\t_itemcnt_=" << outcnt << op_v << '\n';
-//
-//	string op("\t_op_=sum:_golds_|item:_item_|item_sum:_item_,_itemcnt_|item_sum:_item_,_golds_|item:_lv_");
-//   	 set_basic_info(oss, "_购买道具_", pay_type, ts, acct_id);
-//	oss << "\t_lv_=" << lv << "\t_golds_=" << pay_amount
-//        << "\t_item_=" << outcome << "\t_itemcnt_=" << outcnt
-//		<< op << '\n';
-//
-	write_basic_log(oss.str(), ts);
-    if(pay_type == "_mibiitem_"){
-    if(m_serverID != 0){
-		write_basic_log2(oss2.str(), ts);
-    }
-    }
-    if(pay_type == "_coinsbuyitem_"){
-    if(m_serverID != 0){
-		write_basic_log2(oss2.str(), ts);
-    }
-    }
+	//	string op_v("\t_op_=sum:_golds_|item:_item_|item_sum:_item_,_itemcnt_|item_sum:_item_,_golds_");
+	//	set_basic_info(oss, stid, pay_type, ts, acct_id);
+	//	oss << "\t_golds_=" << pay_amount << "\t_item_=" << outcome << "\t_itemcnt_=" << outcnt << op_v << '\n';
+	//
+	//	string op("\t_op_=sum:_golds_|item:_item_|item_sum:_item_,_itemcnt_|item_sum:_item_,_golds_|item:_lv_");
+	//   	 set_basic_info(oss, "_购买道具_", pay_type, ts, acct_id);
+	//	oss << "\t_lv_=" << lv << "\t_golds_=" << pay_amount
+	//        << "\t_item_=" << outcome << "\t_itemcnt_=" << outcnt
+	//		<< op << '\n';
+	//
+	if(m_writeToTongji){
+		write_basic_log(oss.str(), ts);
+	}
+	if(pay_type == "_mibiitem_"){
+		if(m_writeToTms){
+			write_basic_log2(oss2.str(), ts);
+		}
+	}
+	if(pay_type == "_coinsbuyitem_"){
+		if(m_writeToTms){
+			write_basic_log2(oss2.str(), ts);
+		}
+	}
 }
 
 void StatLogger::monitor_dbserver(int gameid, const char* type) {
 	time_t ts = time(0);
 	ostringstream oss;
 
-    set_basic_info(oss, "_monitor_", "_notutf8-dbserver_", ts, "-1");
-    string op("\t_op_=item:game|item:");
+	set_basic_info(oss, "_monitor_", "_notutf8-dbserver_", ts, "-1");
+	string op("\t_op_=item:game|item:");
 
-    //_op_=item:game|item:gameid
-    oss << "\tgame=" << gameid << "\t" << gameid << "=" << type << op << gameid << "\n";
+	//_op_=item:game|item:gameid
+	oss << "\tgame=" << gameid << "\t" << gameid << "=" << type << op << gameid << "\n";
 	write_basic_log(oss.str(), ts);
 }
 
@@ -1468,42 +1618,41 @@ const char* StatLogger::logout_time_interval(int tm) const
 }
 
 void StatLogger::set_basic_info(ostringstream& oss, const string& statname, const string& sub_statname,
-								time_t ts, const string& acct_id, const string& player_id) const
+		time_t ts, const string& acct_id, const string& player_id) const
 {
 	oss << "_hip_=" << m_hostip << "\t_stid_=" << statname << "\t_sstid_=" << sub_statname
 		<< "\t_gid_=" << m_appid << "\t_zid_=" << m_zoneid
 		<< "\t_sid_=" << m_svrid << "\t_pid_=" << m_siteid
-        << "\t_ts_=" << ts << "\t_acid_=" << (acct_id.size() ? acct_id: "-1")
+		<< "\t_ts_=" << ts << "\t_acid_=" << (acct_id.size() ? acct_id: "-1")
 		<< "\t_plid_=" << (player_id.size() ? player_id : "-1");
 }
 
 void StatLogger::set_basic_info2(ostringstream& oss, int logID,
-								time_t ts, const string& acct_id, const string& player_id) const
+		time_t ts, const string& acct_id, const string& player_id) const
 {
-	oss << "_hip_=" << m_hostip << "\t_logid_=" << logID << "\t_svrid_=" << m_serverID
-        << "\t_ts_=" << ts << "\t_acid_=" << (acct_id.size() ? acct_id: "-1")
+		oss << "_hip_=" << m_hostip << "\t_logid_=" << logID
+		<< "\t_gid_=" << m_appid << "\t_zid_=" << m_zoneid << "\t_sid_=" << m_svrid << "\t_pid_=" << m_siteid
+		<< "\t_ts_=" << ts << "\t_acid_=" << (acct_id.size() ? acct_id: "-1")
 		<< "\t_plid_=" << (player_id.size() ? player_id : "-1");
 }
 
 void StatLogger::set_basic_info3(ostringstream& oss, const string& statname, const string& sub_statname,
-								time_t ts, const string& acct_id, const string& player_id) const
+		time_t ts, const string& acct_id, const string& player_id) const
 {
 	oss << "_hip_=" << m_hostip << "\t_stid_=" << statname << "\t_sstid_=" << sub_statname
-	<< "\t_svrid_=" << m_serverID
-	<< "\t_gid_=" << m_appid << "\t_zid_=" << m_zoneid
-	<< "\t_sid_=" << m_svrid << "\t_pid_=" << m_siteid
-        << "\t_ts_=" << ts << "\t_acid_=" << (acct_id.size() ? acct_id: "-1")
+		<< "\t_gid_=" << m_appid << "\t_zid_=" << m_zoneid << "\t_sid_=" << m_svrid << "\t_pid_=" << m_siteid
+		<< "\t_ts_=" << ts << "\t_acid_=" << (acct_id.size() ? acct_id: "-1")
 		<< "\t_plid_=" << (player_id.size() ? player_id : "-1");
 }
 
 void StatLogger::set_device_info(ostringstream& oss, string& op, const string& ads_id, const string& browser,
-									const string& device, const string& os, const string& resolution,
-									const string& network, const string& isp) const
+		const string& device, const string& os, const string& resolution,
+		const string& network, const string& isp) const
 {
 	if (ads_id.size()) {
 		// 广告字段长度暂时不做长度限制
 		// 一般都是英文字符，无需判断utf8
-    MY_ASSERT(value_no_invalid_chars(ads_id));
+		MY_ASSERT(value_no_invalid_chars(ads_id));
 		oss << "\t_ad_=" << ads_id;
 		//op += "|item:_ad_,";
 	}
@@ -1543,8 +1692,8 @@ void StatLogger::set_device_info(ostringstream& oss, string& op, const string& a
 }
 
 void StatLogger::set_user_info_reg(ostringstream& oss, const string& statname, const string& sub_statname,
-			time_t ts, const uint32_t& mimi_id, string& op, const string& tad, const uint32_t& cli_ip, 
-			GameType game_type, RegType reg_type, const string& acct_id, const int& acct_gid, int flag) const
+		time_t ts, const uint32_t& mimi_id, string& op, const string& tad, const uint32_t& cli_ip, 
+		GameType game_type, RegType reg_type, const string& acct_id, const int& acct_gid, int flag) const
 {
 	int gameid = -1;
 	if(flag == 0) gameid = m_appid;
@@ -1552,52 +1701,52 @@ void StatLogger::set_user_info_reg(ostringstream& oss, const string& statname, c
 	oss << "_hip_=" << m_hostip << "\t_stid_=" << statname << "\t_sstid_=" << sub_statname
 		<< "\t_gid_=" << gameid << "\t_zid_=" << m_zoneid
 		<< "\t_sid_=" << m_svrid << "\t_pid_=" << m_siteid
-        << "\t_ts_=" << ts << "\t_acid_=" << mimi_id;
+		<< "\t_ts_=" << ts << "\t_acid_=" << mimi_id;
 
 	string gtype, rtype;
 	switch (game_type) {
-	case gtype_web:
-		gtype = "webgame";
-		break;
-	case gtype_mobile:
-		gtype = "mobilegame";
-		break;
-	default:
-		break;
+		case gtype_web:
+			gtype = "webgame";
+			break;
+		case gtype_mobile:
+			gtype = "mobilegame";
+			break;
+		default:
+			break;
 	}
 	switch (reg_type) {
-	case rtype_mail:
-		rtype = "mail";
-		break;
-	case rtype_apple:
-		rtype = "appleid";
-		break;
-	case rtype_b03:
-		rtype = "b03mobile";
-		break;
-	case rtype_android:
-		rtype = "android";
-		break;
-	case rtype_mac:
-		rtype = "mac";
-		break;
-	case rtype_username:
-		rtype = "userdefine";
-		break;
-	case rtype_open:
-		rtype = "openudid";
-		break;
-	case rtype_mobile:
-		rtype = "mobile";
-		break;
-	case rtype_token:
-		rtype = "tokenid";
-		break;
-	case rtype_mimi:
-		rtype = "mimi";
-		break;
-	default:
-		break;
+		case rtype_mail:
+			rtype = "mail";
+			break;
+		case rtype_apple:
+			rtype = "appleid";
+			break;
+		case rtype_b03:
+			rtype = "b03mobile";
+			break;
+		case rtype_android:
+			rtype = "android";
+			break;
+		case rtype_mac:
+			rtype = "mac";
+			break;
+		case rtype_username:
+			rtype = "userdefine";
+			break;
+		case rtype_open:
+			rtype = "openudid";
+			break;
+		case rtype_mobile:
+			rtype = "mobile";
+			break;
+		case rtype_token:
+			rtype = "tokenid";
+			break;
+		case rtype_mimi:
+			rtype = "mimi";
+			break;
+		default:
+			break;
 	}
 	if(tad.size()) {
 		oss << "\t_tad_=" << tad;
@@ -1621,60 +1770,60 @@ void StatLogger::set_user_info_reg(ostringstream& oss, const string& statname, c
 	oss << "\t_cip_=" << cli_ip;
 }
 void StatLogger::set_user_info_reg2(ostringstream& oss, int logID,
-			time_t ts, const uint32_t& mimi_id, string& op, const string& tad, const uint32_t& cli_ip, 
-			GameType game_type, RegType reg_type, const string& acct_id, const int& acct_gid, int flag) const
+		time_t ts, const uint32_t& mimi_id, string& op, const string& tad, const uint32_t& cli_ip, 
+		GameType game_type, RegType reg_type, const string& acct_id, const int& acct_gid, int flag) const
 {
 	int gameid = -1;
 	if(flag == 0) gameid = m_appid;
 	else gameid = acct_gid;
 	oss << "_hip_=" << m_hostip << "\t_logid_=" << logID
-		<< "\t_svrid_=" << m_serverID
-        << "\t_ts_=" << ts << "\t_acid_=" << mimi_id;
+		<< "\t_gid_=" << m_appid << "\t_zid_=" << m_zoneid << "\t_sid_=" << m_svrid << "\t_pid_=" << m_siteid
+		<< "\t_ts_=" << ts << "\t_acid_=" << mimi_id;
 
 	string gtype, rtype;
 	switch (game_type) {
-	case gtype_web:
-		gtype = "webgame";
-		break;
-	case gtype_mobile:
-		gtype = "mobilegame";
-		break;
-	default:
-		break;
+		case gtype_web:
+			gtype = "webgame";
+			break;
+		case gtype_mobile:
+			gtype = "mobilegame";
+			break;
+		default:
+			break;
 	}
 	switch (reg_type) {
-	case rtype_mail:
-		rtype = "mail";
-		break;
-	case rtype_apple:
-		rtype = "appleid";
-		break;
-	case rtype_b03:
-		rtype = "b03mobile";
-		break;
-	case rtype_android:
-		rtype = "android";
-		break;
-	case rtype_mac:
-		rtype = "mac";
-		break;
-	case rtype_username:
-		rtype = "userdefine";
-		break;
-	case rtype_open:
-		rtype = "openudid";
-		break;
-	case rtype_mobile:
-		rtype = "mobile";
-		break;
-	case rtype_token:
-		rtype = "tokenid";
-		break;
-	case rtype_mimi:
-		rtype = "mimi";
-		break;
-	default:
-		break;
+		case rtype_mail:
+			rtype = "mail";
+			break;
+		case rtype_apple:
+			rtype = "appleid";
+			break;
+		case rtype_b03:
+			rtype = "b03mobile";
+			break;
+		case rtype_android:
+			rtype = "android";
+			break;
+		case rtype_mac:
+			rtype = "mac";
+			break;
+		case rtype_username:
+			rtype = "userdefine";
+			break;
+		case rtype_open:
+			rtype = "openudid";
+			break;
+		case rtype_mobile:
+			rtype = "mobile";
+			break;
+		case rtype_token:
+			rtype = "tokenid";
+			break;
+		case rtype_mimi:
+			rtype = "mimi";
+			break;
+		default:
+			break;
 	}
 	if(tad.size()) {
 		oss << "\t_tad_=" << tad;
@@ -1699,8 +1848,8 @@ void StatLogger::set_user_info_reg2(ostringstream& oss, int logID,
 }
 
 void StatLogger::set_user_info_login(ostringstream& oss, const string& statname, const string& sub_statname,
-			time_t ts, const uint32_t& mimi_id, string& op, const string& tad, const uint32_t& cli_ip, 
-			GameType game_type, LoginType login_type, const string& acct_id, const int& acct_gid, int flag) const
+		time_t ts, const uint32_t& mimi_id, string& op, const string& tad, const uint32_t& cli_ip, 
+		GameType game_type, LoginType login_type, const string& acct_id, const int& acct_gid, int flag) const
 {
 	int gameid = -1;
 	if(flag == 0) gameid = m_appid;
@@ -1708,55 +1857,55 @@ void StatLogger::set_user_info_login(ostringstream& oss, const string& statname,
 	oss << "_hip_=" << m_hostip << "\t_stid_=" << statname << "\t_sstid_=" << sub_statname
 		<< "\t_gid_=" << gameid << "\t_zid_=" << m_zoneid
 		<< "\t_sid_=" << m_svrid << "\t_pid_=" << m_siteid
-        << "\t_ts_=" << ts << "\t_acid_=" << mimi_id;
+		<< "\t_ts_=" << ts << "\t_acid_=" << mimi_id;
 
 	string gtype, ltype;
 	switch (game_type) {
-	case gtype_web:
-		gtype = "webgame";
-		break;
-	case gtype_mobile:
-		gtype = "mobilegame";
-		break;
-	default:
-		break;
+		case gtype_web:
+			gtype = "webgame";
+			break;
+		case gtype_mobile:
+			gtype = "mobilegame";
+			break;
+		default:
+			break;
 	}
 	switch (login_type) {
-	case ltype_mail:
-		ltype = "mail";
-		break;
-	case ltype_apple:
-		ltype = "appleid";
-		break;
-	case ltype_b03:
-		ltype = "b03mobile";
-		break;
-	case ltype_android:
-		ltype = "android";
-		break;
-	case ltype_mac:
-		ltype = "mac";
-		break;
-	case ltype_username:
-		ltype = "userdefine";
-		break;
-	case ltype_open:
-		ltype = "openudid";
-		break;
-	case ltype_mobile:
-		ltype = "mobile";
-		break;
-	case ltype_token:
-		ltype = "tokenid";
-		break;
-	case ltype_unknown:
-		ltype = "unknown";
-		break;
-	case ltype_mimi:
-		ltype = "mimi";
-		break;
-	default:
-		break;
+		case ltype_mail:
+			ltype = "mail";
+			break;
+		case ltype_apple:
+			ltype = "appleid";
+			break;
+		case ltype_b03:
+			ltype = "b03mobile";
+			break;
+		case ltype_android:
+			ltype = "android";
+			break;
+		case ltype_mac:
+			ltype = "mac";
+			break;
+		case ltype_username:
+			ltype = "userdefine";
+			break;
+		case ltype_open:
+			ltype = "openudid";
+			break;
+		case ltype_mobile:
+			ltype = "mobile";
+			break;
+		case ltype_token:
+			ltype = "tokenid";
+			break;
+		case ltype_unknown:
+			ltype = "unknown";
+			break;
+		case ltype_mimi:
+			ltype = "mimi";
+			break;
+		default:
+			break;
 	}
 	if(tad.size()) {
 		oss << "\t_tad_=" << tad;
@@ -1781,63 +1930,63 @@ void StatLogger::set_user_info_login(ostringstream& oss, const string& statname,
 }
 
 void StatLogger::set_user_info_login2(ostringstream& oss, int logID,
-			time_t ts, const uint32_t& mimi_id, string& op, const string& tad, const uint32_t& cli_ip, 
-			GameType game_type, LoginType login_type, const string& acct_id, const int& acct_gid, int flag) const
+		time_t ts, const uint32_t& mimi_id, string& op, const string& tad, const uint32_t& cli_ip, 
+		GameType game_type, LoginType login_type, const string& acct_id, const int& acct_gid, int flag) const
 {
 	int gameid = -1;
 	if(flag == 0) gameid = m_appid;
 	else gameid = acct_gid;
 	oss << "_hip_=" << m_hostip << "\t_logid_=" << logID
-		<< "\t_svrid_=" << m_serverID << "\t_pid_=" << m_siteid
-        << "\t_ts_=" << ts << "\t_acid_=" << mimi_id;
+		<< "\t_gid_=" << m_appid << "\t_zid_=" << m_zoneid << "\t_sid_=" << m_svrid << "\t_pid_=" << m_siteid
+		<< "\t_ts_=" << ts << "\t_acid_=" << mimi_id;
 
 	string gtype, ltype;
 	switch (game_type) {
-	case gtype_web:
-		gtype = "webgame";
-		break;
-	case gtype_mobile:
-		gtype = "mobilegame";
-		break;
-	default:
-		break;
+		case gtype_web:
+			gtype = "webgame";
+			break;
+		case gtype_mobile:
+			gtype = "mobilegame";
+			break;
+		default:
+			break;
 	}
 	switch (login_type) {
-	case ltype_mail:
-		ltype = "mail";
-		break;
-	case ltype_apple:
-		ltype = "appleid";
-		break;
-	case ltype_b03:
-		ltype = "b03mobile";
-		break;
-	case ltype_android:
-		ltype = "android";
-		break;
-	case ltype_mac:
-		ltype = "mac";
-		break;
-	case ltype_username:
-		ltype = "userdefine";
-		break;
-	case ltype_open:
-		ltype = "openudid";
-		break;
-	case ltype_mobile:
-		ltype = "mobile";
-		break;
-	case ltype_token:
-		ltype = "tokenid";
-		break;
-	case ltype_unknown:
-		ltype = "unknown";
-		break;
-	case ltype_mimi:
-		ltype = "mimi";
-		break;
-	default:
-		break;
+		case ltype_mail:
+			ltype = "mail";
+			break;
+		case ltype_apple:
+			ltype = "appleid";
+			break;
+		case ltype_b03:
+			ltype = "b03mobile";
+			break;
+		case ltype_android:
+			ltype = "android";
+			break;
+		case ltype_mac:
+			ltype = "mac";
+			break;
+		case ltype_username:
+			ltype = "userdefine";
+			break;
+		case ltype_open:
+			ltype = "openudid";
+			break;
+		case ltype_mobile:
+			ltype = "mobile";
+			break;
+		case ltype_token:
+			ltype = "tokenid";
+			break;
+		case ltype_unknown:
+			ltype = "unknown";
+			break;
+		case ltype_mimi:
+			ltype = "mimi";
+			break;
+		default:
+			break;
 	}
 	if(tad.size()) {
 		oss << "\t_tad_=" << tad;
@@ -1871,7 +2020,7 @@ void StatLogger::write_basic_log(const std::string& s, time_t ts)
 
 	// 每20秒时间切换文件，跨天也切换文件
 	if ((ts < m_basic_ts) || ((ts - m_basic_ts) > 19) || (m_basic_fd == -1) || ((m_basic_ts + 8*60*60)/86400 != (ts + 8*60*60)/86400))
-    {
+	{
 		close(m_basic_fd);
 		m_basic_ts = ts - (ts % 20);
 		ostringstream oss;
@@ -1883,7 +2032,7 @@ void StatLogger::write_basic_log(const std::string& s, time_t ts)
 		{//平台组络的日志
 			oss << m_path << "/inbox/" << m_appid << "_account_basic_" << m_basic_ts;
 		}
-			m_basic_fd = open(oss.str().c_str(), O_WRONLY | O_APPEND | O_CREAT, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
+		m_basic_fd = open(oss.str().c_str(), O_WRONLY | O_APPEND | O_CREAT, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
 		if (m_basic_fd == -1) {
 			errlog(string("[write_basic_log]open(): ") + strerror(errno));
 		}
@@ -1893,7 +2042,7 @@ void StatLogger::write_basic_log(const std::string& s, time_t ts)
 
 	if (write(m_basic_fd, s.c_str(), s.size()) == -1) {
 		errlog(string("[write_basic_log]write(): ") + strerror(errno));
-        close(m_basic_fd);
+		close(m_basic_fd);
 		m_basic_fd = -1;
 		m_chksum1 = m_chksum2 = calc_checksum();
 	}
@@ -1909,7 +2058,7 @@ void StatLogger::write_basic_log2(const std::string& s, time_t ts)
 
 	// 每20秒时间切换文件，跨天也切换文件
 	if ((ts < m_basic_ts2) || ((ts - m_basic_ts2) > 19) || (m_basic_fd2 == -1) || ((m_basic_ts2 + 8*60*60)/86400 != (ts + 8*60*60)/86400))
-    {
+	{
 		close(m_basic_fd2);
 		m_basic_ts2 = ts - (ts % 20);
 		ostringstream oss;
@@ -1921,7 +2070,7 @@ void StatLogger::write_basic_log2(const std::string& s, time_t ts)
 		{//平台组络的日志
 			oss << m_path2 << "/inbox/" << m_appid << "_account_basic_" << m_basic_ts2;
 		}
-			m_basic_fd2 = open(oss.str().c_str(), O_WRONLY | O_APPEND | O_CREAT, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
+		m_basic_fd2 = open(oss.str().c_str(), O_WRONLY | O_APPEND | O_CREAT, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
 		if (m_basic_fd2 == -1) {
 			errlog(string("[write_basic_log]open(): ") + strerror(errno));
 		}
@@ -1931,7 +2080,7 @@ void StatLogger::write_basic_log2(const std::string& s, time_t ts)
 
 	if (write(m_basic_fd2, s.c_str(), s.size()) == -1) {
 		errlog(string("[write_basic_log]write(): ") + strerror(errno));
-        close(m_basic_fd2);
+		close(m_basic_fd2);
 		m_basic_fd2 = -1;
 		m_chksum1 = m_chksum2 = calc_checksum();
 	}
@@ -1960,7 +2109,7 @@ void StatLogger::write_custom_log(const std::string& s, time_t ts)
 		}
 
 		m_custom_fd = open(oss.str().c_str(), O_WRONLY | O_APPEND | O_CREAT,
-							S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
+				S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
 		if (m_custom_fd == -1) {
 			errlog(string("[write_custom_log]open(): ") + strerror(errno));
 		}
@@ -1970,7 +2119,7 @@ void StatLogger::write_custom_log(const std::string& s, time_t ts)
 
 	if (write(m_custom_fd, s.c_str(), s.size()) == -1) {
 		errlog(string("[write_custom_log]write(): ") + strerror(errno));
-        close(m_custom_fd);
+		close(m_custom_fd);
 		m_custom_fd = -1;
 		m_chksum1 = m_chksum2 = calc_checksum();
 	}
@@ -1999,7 +2148,7 @@ void StatLogger::write_custom_log2(const std::string& s, time_t ts)
 		}
 
 		m_custom_fd2 = open(oss.str().c_str(), O_WRONLY | O_APPEND | O_CREAT,
-							S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
+				S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
 		if (m_custom_fd2 == -1) {
 			errlog(string("[write_custom_log2]open(): ") + strerror(errno));
 		}
@@ -2009,7 +2158,7 @@ void StatLogger::write_custom_log2(const std::string& s, time_t ts)
 
 	if (write(m_custom_fd2, s.c_str(), s.size()) == -1) {
 		errlog(string("[write_custom_log2]write(): ") + strerror(errno));
-        close(m_custom_fd2);
+		close(m_custom_fd2);
 		m_custom_fd2 = -1;
 		m_chksum1 = m_chksum2 = calc_checksum();
 	}
