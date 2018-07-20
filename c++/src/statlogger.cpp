@@ -1446,10 +1446,10 @@ void StatLogger::log(string stat_name, string sub_stat_name, string acct_id, str
 
 
 	if(m_writeToTongji){
-		write_basic_log(oss.str(), ts);
+		write_custom_log(oss.str(), ts);
 	}
 	if(m_writeToTms){
-		write_basic_log2(oss2.str(), ts);
+		write_custom_log2(oss2.str(), ts);
 	}
 	
 }
